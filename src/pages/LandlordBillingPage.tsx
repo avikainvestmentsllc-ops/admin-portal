@@ -32,6 +32,7 @@ export default function LandlordBillingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
+  const [editSeed, setEditSeed] = useState<LandlordPackageView | null>(null);
 
   const load = useCallback(async () => {
     if (!accountId) return;
@@ -59,12 +60,32 @@ export default function LandlordBillingPage() {
 
   const account = data?.account;
   const billing = data?.billing ?? [];
-  // Current package = latest by start date.
-  const currentPackage = packages.reduce<LandlordPackageView | null>((latest, p) => {
-    if (!p.packageStartDate) return latest;
-    if (!latest || (latest.packageStartDate ?? '') < p.packageStartDate) return p;
-    return latest;
-  }, null);
+
+  // Classify each package by its start/end dates relative to now.
+  //  - Active:   start <= now and (end is null or end >= now)
+  //  - Upcoming: start > now
+  //  - Expired:  end < now
+  const now = Date.now();
+  const planStatus = (p: LandlordPackageView): 'Active' | 'Upcoming' | 'Expired' | '—' => {
+    if (!p.packageStartDate) return '—';
+    const start = new Date(p.packageStartDate).getTime();
+    if (Number.isNaN(start)) return '—';
+    if (start > now) return 'Upcoming';
+    const end = p.packageEndDate ? new Date(p.packageEndDate).getTime() : null;
+    if (end != null && !Number.isNaN(end) && end < now) return 'Expired';
+    return 'Active';
+  };
+
+  // Packages sorted newest start date first.
+  const sortedPackages = [...packages]
+    .filter((p) => p.packageStartDate)
+    .sort((a, b) => (b.packageStartDate ?? '').localeCompare(a.packageStartDate ?? ''));
+
+  // The future-start (upcoming) package, if any. Its presence hides the top "Change Package"
+  // button — the pending plan is edited in place via the per-row edit icon instead.
+  const upcomingPackage = sortedPackages.find((p) => planStatus(p) === 'Upcoming') ?? null;
+  // Current package = latest by start date (used to seed the change slide-in).
+  const currentPackage = sortedPackages[0] ?? null;
 
   return (
     <div className="content wide">
@@ -106,27 +127,71 @@ export default function LandlordBillingPage() {
             </div>
           </div>
 
-          {/* Current package */}
+          {/* Landlord packages */}
           <div className="section-head">
-            <h3 className="section-title">Current Package</h3>
-            <button onClick={() => setChanging(true)}>Change Package</button>
+            <h3 className="section-title">Landlord Package</h3>
+            {/* Hide "Change Package" while a future-start plan is pending — edit it in place instead. */}
+            {!upcomingPackage && (
+              <button onClick={() => { setEditSeed(currentPackage); setChanging(true); }}>
+                Change Package
+              </button>
+            )}
           </div>
-          {!currentPackage ? (
+          {sortedPackages.length === 0 ? (
             <p className="muted">No package assigned.</p>
           ) : (
-            <div className="detail-card">
-              <div className="detail-grid">
-                <div><span className="detail-label">Package</span>{currentPackage.accountPackageName}</div>
-                <div><span className="detail-label">Start</span>{isoToDate(currentPackage.packageStartDate)}</div>
-                <div><span className="detail-label">End</span>{isoToDate(currentPackage.packageEndDate)}</div>
-                <div>
-                  <span className="detail-label">Add-ons</span>
-                  {Array.isArray(currentPackage.addOns) && currentPackage.addOns.length > 0
-                    ? (currentPackage.addOns as Array<{ adons_name?: string }>)
-                        .map((a) => a.adons_name).filter(Boolean).join(', ')
-                    : '—'}
-                </div>
-              </div>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Package</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Add-ons</th>
+                    <th>Plan</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPackages.map((p) => {
+                    const status = planStatus(p);
+                    const addOns = Array.isArray(p.addOns) && p.addOns.length > 0
+                      ? (p.addOns as Array<{ adons_name?: string }>)
+                          .map((a) => a.adons_name).filter(Boolean).join(', ')
+                      : '—';
+                    return (
+                      <tr key={p.accountPackageId ?? p.packageStartDate}>
+                        <td>{p.accountPackageName}</td>
+                        <td>{isoToDate(p.packageStartDate)}</td>
+                        <td>{isoToDate(p.packageEndDate)}</td>
+                        <td>{addOns}</td>
+                        <td>
+                          <span className={
+                            status === 'Active' ? 'badge on'
+                              : status === 'Upcoming' ? 'badge pending'
+                              : status === 'Expired' ? 'badge off'
+                              : ''
+                          }>
+                            {status}
+                          </span>
+                        </td>
+                        <td className="actions">
+                          {status === 'Upcoming' && (
+                            <button
+                              className="ghost sm"
+                              title="Edit upcoming plan"
+                              aria-label="Edit upcoming plan"
+                              onClick={() => { setEditSeed(p); setChanging(true); }}
+                            >
+                              ✎
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
 
@@ -168,11 +233,12 @@ export default function LandlordBillingPage() {
       {changing && account && (
         <ChangePackageSlideIn
           accountId={account.accountId}
-          current={currentPackage}
+          current={editSeed ?? currentPackage}
           options={options}
-          onClose={() => setChanging(false)}
+          onClose={() => { setChanging(false); setEditSeed(null); }}
           onSaved={() => {
             setChanging(false);
+            setEditSeed(null);
             void load();
           }}
         />

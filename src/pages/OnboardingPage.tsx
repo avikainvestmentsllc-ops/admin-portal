@@ -4,6 +4,53 @@ import { listLandlords, listPackages, ApiRequestError } from '../api/client';
 import type { LandlordAccountView, PackageOption } from '../api/types';
 import LandlordSlideIn, { type SlideMode } from './LandlordSlideIn';
 
+// Collapsible landlord card for XS. The header (Customer ID, Business Name, Status) is
+// clickable and opens the View page; Email, Phone and the View/Edit buttons are collapsible.
+function OnboardingCard({
+  account,
+  onView,
+  onEdit,
+}: {
+  account: LandlordAccountView;
+  onView: () => void;
+  onEdit: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="ob-card">
+      <button type="button" className="ob-card-head" onClick={onView}>
+        <div className="ob-card-main">
+          <span className="ob-card-cid">{account.customerAccountId}</span>
+          <span className="ob-card-name">{account.businessName}</span>
+        </div>
+        <span className={account.accountStatus ? 'badge on' : 'badge off'}>
+          {account.accountStatus ? 'Active' : 'Inactive'}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className="ob-card-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? 'Less' : 'More'} {open ? '▲' : '▼'}
+      </button>
+
+      {open && (
+        <div className="ob-card-body">
+          <div className="ob-card-row"><span className="ob-card-label">Email</span><span>{account.email || '—'}</span></div>
+          <div className="ob-card-row"><span className="ob-card-label">Phone</span><span>{account.phoneNumber || '—'}</span></div>
+          <div className="ob-card-actions">
+            <button className="ghost sm" onClick={onView}>View</button>
+            <button className="ghost sm" onClick={onEdit}>Edit</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<LandlordAccountView[]>([]);
@@ -59,39 +106,54 @@ export default function OnboardingPage() {
       ) : accounts.length === 0 ? (
         <p className="muted">No landlord accounts yet. Click “Onboard Landlord” to add one.</p>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Customer ID</th>
-                <th>Business Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((a) => (
-                <tr key={a.accountId}>
-                  <td>{a.customerAccountId}</td>
-                  <td>{a.businessName}</td>
-                  <td>{a.email}</td>
-                  <td>{a.phoneNumber}</td>
-                  <td>
-                    <span className={a.accountStatus ? 'badge on' : 'badge off'}>
-                      {a.accountStatus ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="actions">
-                    <button className="ghost sm" onClick={() => navigate(`/onboarding/${a.accountId}`)}>View</button>
-                    <button className="ghost sm" onClick={() => openSlide('edit', a.accountId)}>Edit</button>
-                  </td>
+        <>
+          {/* Desktop: table */}
+          <div className="table-wrap onboarding-desktop">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Customer ID</th>
+                  <th>Business Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {accounts.map((a) => (
+                  <tr key={a.accountId}>
+                    <td>{a.customerAccountId}</td>
+                    <td>{a.businessName}</td>
+                    <td>{a.email}</td>
+                    <td>{a.phoneNumber}</td>
+                    <td>
+                      <span className={a.accountStatus ? 'badge on' : 'badge off'}>
+                        {a.accountStatus ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="actions">
+                      <button className="ghost sm" onClick={() => navigate(`/onboarding/${a.accountId}`)}>View</button>
+                      <button className="ghost sm" onClick={() => openSlide('edit', a.accountId)}>Edit</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* XS: collapsible cards */}
+          <div className="onboarding-cards">
+            {accounts.map((a) => (
+              <OnboardingCard
+                key={a.accountId}
+                account={a}
+                onView={() => navigate(`/onboarding/${a.accountId}`)}
+                onEdit={() => openSlide('edit', a.accountId)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {slideMode && (
