@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { addAddon, updateAddon, ApiRequestError } from '../api/client';
 import type { AddonRequest, AddonView, PackageView } from '../api/types';
+import InfoTip from '../components/InfoTip';
 
 export type AddonSlideMode = 'add' | 'edit';
 
@@ -65,9 +66,9 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
           ? 'Enter a valid price (0 or greater)'
           : '',
       startDate: !startDate ? 'Start date is required' : '',
-      endDate: !endDate
-        ? 'End date is required'
-        : startDate && endDate && startDate >= endDate
+      // End date is optional (open-ended when blank); when set it must be after the start.
+      endDate:
+        startDate && endDate && startDate >= endDate
           ? 'End date must be after the start date'
           : '',
     };
@@ -91,7 +92,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
         adonsPrice: Number(adonsPrice),
         adonsStatus,
         adonsStartTimeUtc: dateInputToIso(startDate) ?? '',
-        adonsEndTimeUtc: dateInputToIso(endDate) ?? '',
+        adonsEndTimeUtc: dateInputToIso(endDate),
       };
       if (mode === 'add') {
         await addAddon(body);
@@ -172,7 +173,11 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
                   <span className="field-error">{fieldErrors.startDate}</span>
                 )}
               </label>
-              <label>End
+              <label>
+                <span className="label-with-info">
+                  End
+                  <InfoTip text="If you provide the end date, the add-on will expire on this date and you will not be able to select during landlord onboarding" />
+                </span>
                 <input type="date" value={endDate}
                   aria-invalid={showErrors && !!fieldErrors.endDate}
                   onChange={(e) => setEndDate(e.target.value)} />

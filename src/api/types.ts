@@ -157,7 +157,7 @@ export interface AddonRequest {
   adonsPrice: number;
   adonsStatus: boolean;
   adonsStartTimeUtc: string;
-  adonsEndTimeUtc: string;
+  adonsEndTimeUtc: string | null;
 }
 
 /** Shape persisted into landlord_account_package.add_ons (JSON array). */

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { addPackage, updatePackage, ApiRequestError } from '../api/client';
 import type { PackageRequest, PackageView } from '../api/types';
+import InfoTip from '../components/InfoTip';
 
 export type PackageSlideMode = 'add' | 'edit';
 
@@ -49,9 +50,9 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
     if (packagePrice === '' || Number.isNaN(price) || price < 0) {
       return 'Enter a valid price (0 or greater).';
     }
-    // Both-or-neither, and start before end.
-    if ((effectiveStart && !effectiveEnd) || (!effectiveStart && effectiveEnd)) {
-      return 'Provide both effective start and end dates, or neither.';
+    // End date is optional. It may only be set alongside a start date, and must be after it.
+    if (effectiveEnd && !effectiveStart) {
+      return 'Set an effective start date before an end date.';
     }
     if (effectiveStart && effectiveEnd && effectiveStart >= effectiveEnd) {
       return 'Effective start date must be before the end date.';
@@ -119,13 +120,18 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
                 <input type="date" value={effectiveStart}
                   onChange={(e) => setEffectiveStart(e.target.value)} />
               </label>
-              <label>Effective End
+              <label>
+                <span className="label-with-info">
+                  Effective End
+                  <InfoTip text="If you provide the end date, the package will expire on this date and you will not be able to select during landlord onboarding" />
+                </span>
                 <input type="date" value={effectiveEnd}
                   onChange={(e) => setEffectiveEnd(e.target.value)} />
               </label>
             </div>
             <span className="field-hint">
-              A package is only selectable during onboarding when both effective dates are set.
+              A package is selectable during onboarding while today is on/after the start date and
+              on/before the end date. Leave the end date blank for an open-ended package.
             </span>
 
             <label className="checkbox">

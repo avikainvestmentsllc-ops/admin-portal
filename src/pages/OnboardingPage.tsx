@@ -95,8 +95,14 @@ export default function OnboardingPage() {
   return (
     <div className="content wide">
       <div className="page-head">
-        <h2>Onboarding</h2>
-        <button onClick={() => openSlide('add', null)}>+ Onboard Landlord</button>
+        <div>
+          <h2>Onboarding</h2>
+          <p className="page-sub">Manage and track new landlord registrations and account statuses.</p>
+        </div>
+        <button onClick={() => openSlide('add', null)}>
+          <span className="material-symbols-outlined">add</span>
+          Onboard Landlord
+        </button>
       </div>
 
       {error && <div className="error" role="alert">{error}</div>}
