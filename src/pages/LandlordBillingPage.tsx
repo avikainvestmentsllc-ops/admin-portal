@@ -124,6 +124,16 @@ export default function LandlordBillingPage() {
                     account.businessAddress.ZipCode].filter(Boolean).join(', ')}
                 </div>
               )}
+              {account.businessContact && (
+                <div className="detail-wide">
+                  <span className="detail-label">Business Contact</span>
+                  {[
+                    `${account.businessContact.firstName} ${account.businessContact.lastName}`.trim(),
+                    account.businessContact.email,
+                    account.businessContact.phoneNumber,
+                  ].filter(Boolean).join(' · ')}
+                </div>
+              )}
             </div>
           </div>
 

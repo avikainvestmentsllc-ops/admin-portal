@@ -31,9 +31,21 @@ function dateInputToIso(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/** Today's date as a yyyy-MM-dd string in the viewer's local timezone. */
+function todayInput(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const NAME_RE = /^[A-Za-z0-9 .,-]+$/;
+// Up to two decimal places, e.g. "9", "9.9", "9.99" but not "9.999".
+const PRICE_RE = /^\d+(\.\d{1,2})?$/;
+
 export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }: Props) {
   const [adonsPackageId, setAdonsPackageId] = useState(addon?.adonsPackageId ?? '');
   const [adonsName, setAdonsName] = useState(addon?.adonsName ?? '');
+  const [adonsDescription, setAdonsDescription] = useState(addon?.adonsDescription ?? '');
   const [adonsCount, setAdonsCount] = useState(
     addon?.adonsCount != null ? String(addon.adonsCount) : '',
   );
@@ -49,30 +61,52 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
   const [saving, setSaving] = useState(false);
 
   const title = mode === 'add' ? 'Add Add-on' : 'Edit Add-on';
+  const isAdd = mode === 'add';
+  const today = todayInput();
 
-  // Per-field validation messages (empty string = valid). All fields are mandatory.
+  // Per-field validation messages (empty string = valid). Future-date checks apply only
+  // when adding a new add-on — editing an already-started add-on must remain possible.
   const fieldErrors = useMemo(() => {
     const priceNum = Number(adonsPrice);
     const countNum = Number(adonsCount);
     return {
       adonsPackageId: !adonsPackageId ? 'Please select a package' : '',
-      adonsName: !adonsName.trim() ? 'Name is required' : '',
+      adonsName: !adonsName.trim()
+        ? 'Name is required'
+        : adonsName.trim().length > 50
+          ? 'Name must be at most 50 characters'
+          : !NAME_RE.test(adonsName.trim())
+            ? 'Name may only contain letters, numbers, spaces, periods, commas and hyphens'
+            : '',
+      adonsDescription: adonsDescription.trim().length > 200
+        ? 'Description must be at most 200 characters'
+        : '',
       adonsCount:
         adonsCount === '' || Number.isNaN(countNum) || countNum < 0 || !Number.isInteger(countNum)
           ? 'Enter a whole number (0 or greater)'
-          : '',
+          : countNum > 10000
+            ? 'Count must be at most 10000'
+            : '',
       adonsPrice:
         adonsPrice === '' || Number.isNaN(priceNum) || priceNum < 0
           ? 'Enter a valid price (0 or greater)'
+          : !PRICE_RE.test(adonsPrice.trim())
+            ? 'Price may have at most 2 decimal places'
+            : '',
+      startDate: !startDate
+        ? 'Start date is required'
+        : isAdd && startDate <= today
+          ? 'Start date must be in the future'
           : '',
-      startDate: !startDate ? 'Start date is required' : '',
       // End date is optional (open-ended when blank); when set it must be after the start.
       endDate:
-        startDate && endDate && startDate >= endDate
-          ? 'End date must be after the start date'
-          : '',
+        isAdd && endDate && endDate <= today
+          ? 'End date must be in the future'
+          : startDate && endDate && startDate >= endDate
+            ? 'End date must be after the start date'
+            : '',
     };
-  }, [adonsPackageId, adonsName, adonsCount, adonsPrice, startDate, endDate]);
+  }, [adonsPackageId, adonsName, adonsDescription, adonsCount, adonsPrice, startDate, endDate, isAdd, today]);
 
   const hasErrors = Object.values(fieldErrors).some(Boolean);
 
@@ -88,6 +122,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
       const body: AddonRequest = {
         adonsPackageId,
         adonsName: adonsName.trim(),
+        adonsDescription: adonsDescription.trim() || null,
         adonsCount: Number(adonsCount),
         adonsPrice: Number(adonsPrice),
         adonsStatus,
@@ -136,7 +171,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
             </label>
 
             <label>Name
-              <input value={adonsName} maxLength={20}
+              <input value={adonsName} maxLength={50}
                 aria-invalid={showErrors && !!fieldErrors.adonsName}
                 onChange={(e) => setAdonsName(e.target.value)} />
               {showErrors && fieldErrors.adonsName && (
@@ -144,9 +179,18 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
               )}
             </label>
 
+            <label>Description
+              <textarea rows={3} value={adonsDescription} maxLength={200}
+                aria-invalid={showErrors && !!fieldErrors.adonsDescription}
+                onChange={(e) => setAdonsDescription(e.target.value)} />
+              {showErrors && fieldErrors.adonsDescription && (
+                <span className="field-error">{fieldErrors.adonsDescription}</span>
+              )}
+            </label>
+
             <div className="row-2">
               <label>Count
-                <input type="number" min="0" step="1" value={adonsCount}
+                <input type="number" min="0" max="10000" step="1" value={adonsCount}
                   aria-invalid={showErrors && !!fieldErrors.adonsCount}
                   onChange={(e) => setAdonsCount(e.target.value)} />
                 {showErrors && fieldErrors.adonsCount && (

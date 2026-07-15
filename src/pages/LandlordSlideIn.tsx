@@ -79,6 +79,22 @@ function isValidEin(value: string): boolean {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NAME_RE = /^[A-Za-z ]+$/;
+const BUSINESS_NAME_RE = /^[A-Za-z0-9 .,-]+$/;
+const ZIP_RE = /^\d{5}(-\d{4})?$/;
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
+  'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT',
+  'VA', 'WA', 'WV', 'WI', 'WY', 'DC',
+];
+
+/** Today's date as a yyyy-MM-dd string in the viewer's local timezone (for date-input min/comparisons). */
+function todayInput(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 /** Add one calendar day to a YYYY-MM-DD input value; '' stays ''. */
 function nextDay(value: string): string {
@@ -101,6 +117,10 @@ interface FormState {
   city: string;
   state: string;
   zipCode: string;
+  contactFirstName: string;
+  contactLastName: string;
+  contactEmail: string;
+  contactPhoneNumber: string;
   accountStatus: boolean;
   packageId: string;
   packageName: string;
@@ -116,6 +136,7 @@ interface FormState {
 const EMPTY: FormState = {
   email: '', phoneNumber: '', businessName: '', businessEin: '',
   addressLine1: '', addressLine2: '', city: '', state: '', zipCode: '',
+  contactFirstName: '', contactLastName: '', contactEmail: '', contactPhoneNumber: '',
   accountStatus: true, packageId: '', packageName: '', selectedAddons: [],
   packageStartDate: '', packageEndDate: '', freeTrialStartDate: '',
   freeTrialEndDate: '', billingDate: '', billingStatus: false,
@@ -168,6 +189,10 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           city: a.businessAddress?.City ?? '',
           state: a.businessAddress?.State ?? '',
           zipCode: a.businessAddress?.ZipCode ?? '',
+          contactFirstName: a.businessContact?.firstName ?? '',
+          contactLastName: a.businessContact?.lastName ?? '',
+          contactEmail: a.businessContact?.email ?? '',
+          contactPhoneNumber: formatPhone(a.businessContact?.phoneNumber ?? ''),
           accountStatus: a.accountStatus,
           packageId: '',
           packageName: p?.accountPackageName ?? '',
@@ -228,16 +253,26 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
     () => (packageStartLocked ? nextDay(form.freeTrialEndDate) : form.packageStartDate),
     [packageStartLocked, form.freeTrialEndDate, form.packageStartDate],
   );
-  // Billing date always equals the (effective) package start date.
-  const effectiveBillingDate = effectivePackageStart;
+  // Billing date is always the day after the (effective) package start date.
+  const effectiveBillingDate = useMemo(
+    () => nextDay(effectivePackageStart),
+    [effectivePackageStart],
+  );
+
+  // Future-date checks apply only when onboarding a new landlord — editing an existing
+  // landlord's already-started package/free-trial dates must remain possible.
+  const today = todayInput();
+  const isAdd = mode === 'add';
 
   // Per-field validation messages (empty string = valid).
   const fieldErrors = useMemo(() => ({
     email: !form.email.trim()
       ? 'Email is required'
-      : !EMAIL_RE.test(form.email.trim())
-        ? 'Enter a valid email address'
-        : '',
+      : form.email.trim().length > 50
+        ? 'Email must be at most 50 characters'
+        : !EMAIL_RE.test(form.email.trim())
+          ? 'Enter a valid email address'
+          : '',
     phoneNumber: !form.phoneNumber.trim()
       ? 'Phone number is required'
       : !isValidPhone(form.phoneNumber)
@@ -248,22 +283,85 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
       : !isValidEin(form.businessEin)
         ? 'EIN must be 9 digits, e.g. 12-3456789'
         : '',
-    businessName: !form.businessName.trim() ? 'Business name is required' : '',
-    addressLine1: !form.addressLine1.trim() ? 'Address line 1 is required' : '',
-    city: !form.city.trim() ? 'City is required' : '',
+    businessName: !form.businessName.trim()
+      ? 'Business name is required'
+      : form.businessName.trim().length > 100
+        ? 'Business name must be at most 100 characters'
+        : !BUSINESS_NAME_RE.test(form.businessName.trim())
+          ? 'Business name may only contain letters, numbers, spaces, periods, commas and hyphens'
+          : '',
+    addressLine1: !form.addressLine1.trim()
+      ? 'Address line 1 is required'
+      : form.addressLine1.trim().length > 100
+        ? 'Address line 1 must be at most 100 characters'
+        : '',
+    addressLine2: form.addressLine2.trim().length > 100
+      ? 'Address line 2 must be at most 100 characters'
+      : '',
+    city: !form.city.trim()
+      ? 'City is required'
+      : form.city.trim().length > 50
+        ? 'City must be at most 50 characters'
+        : !NAME_RE.test(form.city.trim())
+          ? 'City may only contain letters and spaces'
+          : '',
     state: !form.state.trim() ? 'State is required' : '',
-    zipCode: !form.zipCode.trim() ? 'Zip code is required' : '',
-    packageId: mode === 'add' && !form.packageId ? 'Please select a package' : '',
-    // Package start (effective) is mandatory; billing date derives from it.
-    packageStartDate: !effectivePackageStart ? 'Package start date is required' : '',
-    // A free-trial start requires a free-trial end date.
+    zipCode: !form.zipCode.trim()
+      ? 'Zip code is required'
+      : !ZIP_RE.test(form.zipCode.trim())
+        ? 'Enter a valid ZIP code, e.g. 12345 or 12345-6789'
+        : '',
+    contactFirstName: !form.contactFirstName.trim()
+      ? 'First name is required'
+      : form.contactFirstName.trim().length > 50
+        ? 'First name must be at most 50 characters'
+        : !NAME_RE.test(form.contactFirstName.trim())
+          ? 'First name may only contain letters and spaces'
+          : '',
+    contactLastName: !form.contactLastName.trim()
+      ? 'Last name is required'
+      : form.contactLastName.trim().length > 50
+        ? 'Last name must be at most 50 characters'
+        : !NAME_RE.test(form.contactLastName.trim())
+          ? 'Last name may only contain letters and spaces'
+          : '',
+    contactEmail: !form.contactEmail.trim()
+      ? 'Contact email is required'
+      : form.contactEmail.trim().length > 50
+        ? 'Contact email must be at most 50 characters'
+        : !EMAIL_RE.test(form.contactEmail.trim())
+          ? 'Enter a valid email address'
+          : '',
+    contactPhoneNumber: !form.contactPhoneNumber.trim()
+      ? 'Contact phone number is required'
+      : !isValidPhone(form.contactPhoneNumber)
+        ? 'Phone number must be 10 digits, e.g. (214) 555-9090'
+        : '',
+    packageId: isAdd && !form.packageId ? 'Please select a package' : '',
+    // Package start (effective) is mandatory; billing date derives from it. Future-date
+    // only enforced on add — editing an already-started package must remain possible.
+    packageStartDate: !effectivePackageStart
+      ? 'Package start date is required'
+      : isAdd && effectivePackageStart <= today
+        ? 'Package start date must be in the future'
+        : '',
+    // A free-trial start requires a free-trial end date, and (on add) both must be future
+    // dates with the end after the start.
+    freeTrialStartDate: isAdd && form.freeTrialStartDate && form.freeTrialStartDate <= today
+      ? 'Free trial start date must be in the future'
+      : '',
     freeTrialEndDate: form.freeTrialStartDate && !form.freeTrialEndDate
       ? 'Free trial end date is required when a free trial start date is set'
-      : '',
+      : isAdd && form.freeTrialEndDate && form.freeTrialEndDate <= today
+        ? 'Free trial end date must be in the future'
+        : form.freeTrialStartDate && form.freeTrialEndDate && form.freeTrialEndDate <= form.freeTrialStartDate
+          ? 'Free trial end date must be after the start date'
+          : '',
   }), [
     form.email, form.phoneNumber, form.businessEin, form.businessName,
-    form.addressLine1, form.city, form.state, form.zipCode, form.packageId, mode,
-    effectivePackageStart, form.freeTrialStartDate, form.freeTrialEndDate,
+    form.addressLine1, form.addressLine2, form.city, form.state, form.zipCode,
+    form.contactFirstName, form.contactLastName, form.contactEmail, form.contactPhoneNumber,
+    form.packageId, isAdd, effectivePackageStart, form.freeTrialStartDate, form.freeTrialEndDate, today,
   ]);
 
   const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
@@ -284,6 +382,12 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
         State: form.state,
         ZipCode: form.zipCode,
       };
+      const contact = {
+        firstName: form.contactFirstName.trim(),
+        lastName: form.contactLastName.trim(),
+        email: form.contactEmail.trim(),
+        phoneNumber: onlyDigits(form.contactPhoneNumber),
+      };
       // API receives digits only for phone and EIN.
       const phoneDigits = onlyDigits(form.phoneNumber);
       const einDigits = onlyDigits(form.businessEin);
@@ -294,6 +398,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           businessName: form.businessName,
           businessEin: einDigits,
           businessAddress: address,
+          businessContact: contact,
           accountStatus: form.accountStatus,
           packageId: form.packageId,
           addOns: form.selectedAddons,
@@ -306,12 +411,15 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
         };
         await addLandlord(body);
       } else if (mode === 'edit' && accountId) {
+        // businessName, businessEin and email are locked after onboarding — sent back
+        // unchanged so the request stays valid; the server ignores them regardless.
         const body: UpdateLandlordRequest = {
           email: form.email.trim(),
           phoneNumber: phoneDigits,
           businessName: form.businessName,
           businessEin: einDigits,
           businessAddress: address,
+          businessContact: contact,
           accountStatus: form.accountStatus,
           addOns: form.selectedAddons,
           packageStartDate: localInputToIso(effectivePackageStart),
@@ -349,9 +457,13 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               <legend>Account</legend>
 
               <label>Email
-                <input type="email" value={form.email}
+                <input type="email" value={form.email} maxLength={50}
+                  readOnly={mode === 'edit'} disabled={mode === 'edit'}
                   aria-invalid={showErrors && !!fieldErrors.email}
                   onChange={(e) => set('email', e.target.value)} />
+                {mode === 'edit' && (
+                  <span className="field-hint">Email cannot be changed after onboarding.</span>
+                )}
                 {showErrors && fieldErrors.email && (
                   <span className="field-error">{fieldErrors.email}</span>
                 )}
@@ -366,9 +478,13 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                 )}
               </label>
               <label>Business Name
-                <input value={form.businessName}
+                <input value={form.businessName} maxLength={100}
+                  readOnly={mode === 'edit'} disabled={mode === 'edit'}
                   aria-invalid={showErrors && !!fieldErrors.businessName}
                   onChange={(e) => set('businessName', e.target.value)} />
+                {mode === 'edit' && (
+                  <span className="field-hint">Business name cannot be changed after onboarding.</span>
+                )}
                 {showErrors && fieldErrors.businessName && (
                   <span className="field-error">{fieldErrors.businessName}</span>
                 )}
@@ -376,14 +492,18 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               <label>Business EIN
                 <input value={form.businessEin} inputMode="numeric"
                   placeholder="12-3456789"
+                  readOnly={mode === 'edit'} disabled={mode === 'edit'}
                   aria-invalid={showErrors && !!fieldErrors.businessEin}
                   onChange={(e) => set('businessEin', formatEin(e.target.value))} />
+                {mode === 'edit' && (
+                  <span className="field-hint">Business EIN cannot be changed after onboarding.</span>
+                )}
                 {showErrors && fieldErrors.businessEin && (
                   <span className="field-error">{fieldErrors.businessEin}</span>
                 )}
               </label>
               <label>Address Line 1
-                <input value={form.addressLine1}
+                <input value={form.addressLine1} maxLength={100}
                   aria-invalid={showErrors && !!fieldErrors.addressLine1}
                   onChange={(e) => set('addressLine1', e.target.value)} />
                 {showErrors && fieldErrors.addressLine1 && (
@@ -391,12 +511,16 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                 )}
               </label>
               <label>Address Line 2
-                <input value={form.addressLine2}
+                <input value={form.addressLine2} maxLength={100}
+                  aria-invalid={showErrors && !!fieldErrors.addressLine2}
                   onChange={(e) => set('addressLine2', e.target.value)} />
+                {showErrors && fieldErrors.addressLine2 && (
+                  <span className="field-error">{fieldErrors.addressLine2}</span>
+                )}
               </label>
               <div className="row-3">
                 <label>City
-                  <input value={form.city}
+                  <input value={form.city} maxLength={50}
                     aria-invalid={showErrors && !!fieldErrors.city}
                     onChange={(e) => set('city', e.target.value)} />
                   {showErrors && fieldErrors.city && (
@@ -404,15 +528,19 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                   )}
                 </label>
                 <label>State
-                  <input value={form.state}
+                  <select value={form.state}
                     aria-invalid={showErrors && !!fieldErrors.state}
-                    onChange={(e) => set('state', e.target.value)} />
+                    onChange={(e) => set('state', e.target.value)}>
+                    <option value="">Select…</option>
+                    {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
                   {showErrors && fieldErrors.state && (
                     <span className="field-error">{fieldErrors.state}</span>
                   )}
                 </label>
                 <label>Zip
-                  <input value={form.zipCode}
+                  <input value={form.zipCode} maxLength={10}
+                    placeholder="12345"
                     aria-invalid={showErrors && !!fieldErrors.zipCode}
                     onChange={(e) => set('zipCode', e.target.value)} />
                   {showErrors && fieldErrors.zipCode && (
@@ -424,6 +552,46 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                 <input type="checkbox" checked={form.accountStatus}
                   onChange={(e) => set('accountStatus', e.target.checked)} />
                 Account Active
+              </label>
+            </fieldset>
+
+            <fieldset disabled={readOnly}>
+              <legend>Business Contact</legend>
+
+              <div className="row-2">
+                <label>First Name
+                  <input value={form.contactFirstName} maxLength={50}
+                    aria-invalid={showErrors && !!fieldErrors.contactFirstName}
+                    onChange={(e) => set('contactFirstName', e.target.value)} />
+                  {showErrors && fieldErrors.contactFirstName && (
+                    <span className="field-error">{fieldErrors.contactFirstName}</span>
+                  )}
+                </label>
+                <label>Last Name
+                  <input value={form.contactLastName} maxLength={50}
+                    aria-invalid={showErrors && !!fieldErrors.contactLastName}
+                    onChange={(e) => set('contactLastName', e.target.value)} />
+                  {showErrors && fieldErrors.contactLastName && (
+                    <span className="field-error">{fieldErrors.contactLastName}</span>
+                  )}
+                </label>
+              </div>
+              <label>Email
+                <input type="email" value={form.contactEmail} maxLength={50}
+                  aria-invalid={showErrors && !!fieldErrors.contactEmail}
+                  onChange={(e) => set('contactEmail', e.target.value)} />
+                {showErrors && fieldErrors.contactEmail && (
+                  <span className="field-error">{fieldErrors.contactEmail}</span>
+                )}
+              </label>
+              <label>Phone Number
+                <input value={form.contactPhoneNumber} inputMode="tel"
+                  placeholder="(214) 555-9090"
+                  aria-invalid={showErrors && !!fieldErrors.contactPhoneNumber}
+                  onChange={(e) => set('contactPhoneNumber', formatPhone(e.target.value))} />
+                {showErrors && fieldErrors.contactPhoneNumber && (
+                  <span className="field-error">{fieldErrors.contactPhoneNumber}</span>
+                )}
               </label>
             </fieldset>
 
@@ -504,6 +672,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               <div className="row-2">
                 <label>Package Start
                   <input type="date" value={effectivePackageStart}
+                    min={isAdd ? today : undefined}
                     readOnly={packageStartLocked} disabled={packageStartLocked}
                     aria-invalid={showErrors && !!fieldErrors.packageStartDate}
                     onChange={(e) => set('packageStartDate', e.target.value)} />
@@ -522,10 +691,16 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               <div className="row-2">
                 <label>Free Trial Start
                   <input type="date" value={form.freeTrialStartDate}
+                    min={isAdd ? today : undefined}
+                    aria-invalid={showErrors && !!fieldErrors.freeTrialStartDate}
                     onChange={(e) => set('freeTrialStartDate', e.target.value)} />
+                  {showErrors && fieldErrors.freeTrialStartDate && (
+                    <span className="field-error">{fieldErrors.freeTrialStartDate}</span>
+                  )}
                 </label>
                 <label>Free Trial End
                   <input type="date" value={form.freeTrialEndDate}
+                    min={isAdd ? today : undefined}
                     aria-invalid={showErrors && !!fieldErrors.freeTrialEndDate}
                     onChange={(e) => set('freeTrialEndDate', e.target.value)} />
                   {showErrors && fieldErrors.freeTrialEndDate && (
@@ -535,7 +710,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               </div>
               <label>Billing Date
                 <input type="date" value={effectiveBillingDate} readOnly disabled />
-                <span className="field-hint">Always matches the package start date.</span>
+                <span className="field-hint">Always the day after the package start date.</span>
               </label>
               <label className="checkbox">
                 <input type="checkbox" checked={form.billingStatus}

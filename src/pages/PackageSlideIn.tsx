@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { addPackage, updatePackage, ApiRequestError } from '../api/client';
 import type { PackageRequest, PackageView } from '../api/types';
 import InfoTip from '../components/InfoTip';
@@ -30,8 +30,20 @@ function dateInputToIso(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/** Today's date as a yyyy-MM-dd string in the viewer's local timezone. */
+function todayInput(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const NAME_RE = /^[A-Za-z0-9 .,-]+$/;
+// Up to two decimal places, e.g. "9", "9.9", "9.99" but not "9.999".
+const PRICE_RE = /^\d+(\.\d{1,2})?$/;
+
 export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
   const [packageName, setPackageName] = useState(pkg?.packageName ?? '');
+  const [packageDescription, setPackageDescription] = useState(pkg?.packageDescription ?? '');
   const [packagePrice, setPackagePrice] = useState(
     pkg?.packagePrice != null ? String(pkg.packagePrice) : '',
   );
@@ -39,39 +51,58 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
   const [effectiveStart, setEffectiveStart] = useState(isoToDateInput(pkg?.effectiveStartDateUtc));
   const [effectiveEnd, setEffectiveEnd] = useState(isoToDateInput(pkg?.effectiveEndDateUtc));
 
+  const [showErrors, setShowErrors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const title = mode === 'add' ? 'Add Package' : 'Edit Package';
+  const isAdd = mode === 'add';
+  const today = todayInput();
 
-  function validate(): string | null {
-    if (!packageName.trim()) return 'Package name is required.';
-    const price = Number(packagePrice);
-    if (packagePrice === '' || Number.isNaN(price) || price < 0) {
-      return 'Enter a valid price (0 or greater).';
-    }
-    // End date is optional. It may only be set alongside a start date, and must be after it.
-    if (effectiveEnd && !effectiveStart) {
-      return 'Set an effective start date before an end date.';
-    }
-    if (effectiveStart && effectiveEnd && effectiveStart >= effectiveEnd) {
-      return 'Effective start date must be before the end date.';
-    }
-    return null;
-  }
+  // Per-field validation messages (empty string = valid). Future-date checks apply only
+  // when adding a new package — editing an already-started package must remain possible.
+  const fieldErrors = useMemo(() => ({
+    packageName: !packageName.trim()
+      ? 'Package name is required'
+      : packageName.trim().length > 50
+        ? 'Package name must be at most 50 characters'
+        : !NAME_RE.test(packageName.trim())
+          ? 'Package name may only contain letters, numbers, spaces, periods, commas and hyphens'
+          : '',
+    packageDescription: packageDescription.trim().length > 200
+      ? 'Description must be at most 200 characters'
+      : '',
+    packagePrice: packagePrice === '' || Number.isNaN(Number(packagePrice)) || Number(packagePrice) < 0
+      ? 'Enter a valid price (0 or greater)'
+      : !PRICE_RE.test(packagePrice.trim())
+        ? 'Price may have at most 2 decimal places'
+        : '',
+    effectiveStart: !effectiveStart
+      ? 'Effective start date is required'
+      : isAdd && effectiveStart <= today
+        ? 'Effective start date must be in the future'
+        : '',
+    effectiveEnd: isAdd && effectiveEnd && effectiveEnd <= today
+      ? 'Effective end date must be in the future'
+      : effectiveStart && effectiveEnd && effectiveStart >= effectiveEnd
+        ? 'Effective end date must be after the start date'
+        : '',
+  }), [packageName, packageDescription, packagePrice, effectiveStart, effectiveEnd, isAdd, today]);
+
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
+    if (hasFieldErrors) {
+      setShowErrors(true);
       return;
     }
     setSaving(true);
     try {
       const body: PackageRequest = {
         packageName: packageName.trim(),
+        packageDescription: packageDescription.trim() || null,
         packageStatus,
         packagePrice: Number(packagePrice),
         effectiveStartDateUtc: dateInputToIso(effectiveStart),
@@ -106,19 +137,40 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
 
             <label>Name
               <input value={packageName} maxLength={50}
+                aria-invalid={showErrors && !!fieldErrors.packageName}
                 onChange={(e) => setPackageName(e.target.value)} />
+              {showErrors && fieldErrors.packageName && (
+                <span className="field-error">{fieldErrors.packageName}</span>
+              )}
+            </label>
+
+            <label>Description
+              <textarea rows={3} value={packageDescription} maxLength={200}
+                aria-invalid={showErrors && !!fieldErrors.packageDescription}
+                onChange={(e) => setPackageDescription(e.target.value)} />
+              {showErrors && fieldErrors.packageDescription && (
+                <span className="field-error">{fieldErrors.packageDescription}</span>
+              )}
             </label>
 
             <label>Price (monthly)
               <input type="number" min="0" step="0.01" value={packagePrice}
                 placeholder="0.00"
+                aria-invalid={showErrors && !!fieldErrors.packagePrice}
                 onChange={(e) => setPackagePrice(e.target.value)} />
+              {showErrors && fieldErrors.packagePrice && (
+                <span className="field-error">{fieldErrors.packagePrice}</span>
+              )}
             </label>
 
             <div className="row-2">
               <label>Effective Start
                 <input type="date" value={effectiveStart}
+                  aria-invalid={showErrors && !!fieldErrors.effectiveStart}
                   onChange={(e) => setEffectiveStart(e.target.value)} />
+                {showErrors && fieldErrors.effectiveStart && (
+                  <span className="field-error">{fieldErrors.effectiveStart}</span>
+                )}
               </label>
               <label>
                 <span className="label-with-info">
@@ -126,7 +178,11 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
                   <InfoTip text="If you provide the end date, the package will expire on this date and you will not be able to select during landlord onboarding" />
                 </span>
                 <input type="date" value={effectiveEnd}
+                  aria-invalid={showErrors && !!fieldErrors.effectiveEnd}
                   onChange={(e) => setEffectiveEnd(e.target.value)} />
+                {showErrors && fieldErrors.effectiveEnd && (
+                  <span className="field-error">{fieldErrors.effectiveEnd}</span>
+                )}
               </label>
             </div>
             <span className="field-hint">

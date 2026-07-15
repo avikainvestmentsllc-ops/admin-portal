@@ -44,6 +44,13 @@ export interface BusinessAddress {
   ZipCode: string;
 }
 
+export interface BusinessContact {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+}
+
 export interface LandlordAccountView {
   accountId: string;
   customerAccountId: string;
@@ -52,6 +59,7 @@ export interface LandlordAccountView {
   businessName: string;
   businessEin: string;
   businessAddress: BusinessAddress | null;
+  businessContact: BusinessContact | null;
   accountStatus: boolean;
   createTimeUtc: string;
   updateTimeUtc: string;
@@ -119,6 +127,7 @@ export interface PackageOption {
 export interface PackageView {
   packageId: string;
   packageName: string;
+  packageDescription: string | null;
   packageStatus: boolean;
   packagePrice: number | null;
   effectiveStartDateUtc: string | null;
@@ -129,6 +138,7 @@ export interface PackageView {
 
 export interface PackageRequest {
   packageName: string;
+  packageDescription?: string | null;
   packageStatus: boolean;
   packagePrice: number;
   effectiveStartDateUtc?: string | null;
@@ -141,6 +151,7 @@ export interface AddonView {
   adonsId: string;
   adonsPackageId: string;
   adonsName: string;
+  adonsDescription: string | null;
   adonsCount: number | null;
   adonsPrice: number | null;
   adonsStatus: boolean;
@@ -153,6 +164,7 @@ export interface AddonView {
 export interface AddonRequest {
   adonsPackageId: string;
   adonsName: string;
+  adonsDescription?: string | null;
   adonsCount: number;
   adonsPrice: number;
   adonsStatus: boolean;
@@ -175,6 +187,7 @@ export interface OnboardLandlordRequest {
   businessName: string;
   businessEin: string;
   businessAddress: BusinessAddress;
+  businessContact: BusinessContact;
   accountStatus: boolean;
   packageId: string;
   addOns?: unknown[];
@@ -192,6 +205,7 @@ export interface UpdateLandlordRequest {
   businessName: string;
   businessEin: string;
   businessAddress: BusinessAddress;
+  businessContact: BusinessContact;
   accountStatus: boolean;
   addOns?: unknown[];
   packageStartDate?: string | null;
