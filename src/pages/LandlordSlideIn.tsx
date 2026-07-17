@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   addLandlord,
   getLandlordDetails,
   updateLandlord,
   ApiRequestError,
 } from '../api/client';
+import { toUserMessage } from '../api/errorMessages';
 import type {
   LandlordDetailsResponse,
   OnboardLandlordRequest,
@@ -160,12 +161,27 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
   const [form, setForm] = useState<FormState>(EMPTY);
   const [loading, setLoading] = useState(mode !== 'add');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Load failure only — shown inline at the top since no form is rendered yet.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Submit failure, shown at the top of the slide-in.
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  // Set once a save succeeds; the panel stays open so the user sees this instead of auto-closing.
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  // Id of the landlord created by this panel's own add, once saved — further submits update it.
+  const [createdId, setCreatedId] = useState<string | null>(null);
   // Once the user tries to submit, surface inline validation messages.
   const [showErrors, setShowErrors] = useState(false);
+  // Scrolled into view whenever a success/error message appears, so it's visible on mobile
+  // even if the user submitted from further down the (long) form.
+  const messageRef = useRef<HTMLDivElement>(null);
 
   const readOnly = mode === 'view';
-  const title = mode === 'add' ? 'Onboard Landlord' : mode === 'edit' ? 'Edit Landlord' : 'Landlord Details';
+  // Once a new landlord has been created, its locked fields behave like an existing one's.
+  const isNewlySaved = mode === 'add' && !!createdId;
+  const fieldsLocked = mode === 'edit' || isNewlySaved;
+  const title = mode === 'add'
+    ? (isNewlySaved ? 'Edit Landlord' : 'Onboard Landlord')
+    : mode === 'edit' ? 'Edit Landlord' : 'Landlord Details';
 
   useEffect(() => {
     if (mode === 'add' || !accountId) {
@@ -205,15 +221,17 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           billingStatus: p?.billingStatus ?? false,
         });
       })
-      .catch((e) => setError(e instanceof ApiRequestError ? e.message : 'Failed to load details'))
+      .catch((e) => setLoadError(e instanceof ApiRequestError ? e.message : 'Failed to load details'))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
   }, [mode, accountId]);
 
-  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
+    setSavedMessage(null);
+  };
 
   // The package chosen in the dropdown (add mode) — its addOns drive the selectable list.
   const selectedPackage = useMemo(
@@ -366,9 +384,18 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
 
   const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
 
+  // Bring the success/error banner into view on submit — on mobile the button that triggered
+  // it can be well below the fold, especially given how long this form is.
+  useEffect(() => {
+    if (submitError || savedMessage) {
+      messageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [submitError, savedMessage]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    setSubmitError(null);
+    setSavedMessage(null);
     if (hasFieldErrors) {
       setShowErrors(true);
       return;
@@ -391,7 +418,10 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
       // API receives digits only for phone and EIN.
       const phoneDigits = onlyDigits(form.phoneNumber);
       const einDigits = onlyDigits(form.businessEin);
-      if (mode === 'add') {
+      // Once this panel has created the landlord, further submits update that same account
+      // rather than onboarding a second one.
+      const targetAccountId = createdId ?? accountId;
+      if (mode === 'add' && !targetAccountId) {
         const body: OnboardLandlordRequest = {
           email: form.email.trim(),
           phoneNumber: phoneDigits,
@@ -409,8 +439,10 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           billingDate: localInputToIso(effectiveBillingDate) ?? new Date().toISOString(),
           billingStatus: form.billingStatus,
         };
-        await addLandlord(body);
-      } else if (mode === 'edit' && accountId) {
+        const created = await addLandlord(body);
+        setCreatedId(created.account.accountId);
+        setSavedMessage('Landlord onboarded successfully.');
+      } else if (targetAccountId) {
         // businessName, businessEin and email are locked after onboarding — sent back
         // unchanged so the request stays valid; the server ignores them regardless.
         const body: UpdateLandlordRequest = {
@@ -429,11 +461,12 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           billingDate: localInputToIso(effectiveBillingDate),
           billingStatus: form.billingStatus,
         };
-        await updateLandlord(accountId, body);
+        await updateLandlord(targetAccountId, body);
+        setSavedMessage('Landlord saved successfully.');
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? `${err.message} (${err.errorCode})` : 'Save failed');
+      setSubmitError(toUserMessage(err));
     } finally {
       setSaving(false);
     }
@@ -449,19 +482,26 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
 
         {loading ? (
           <p className="muted" style={{ padding: '1rem' }}>Loading…</p>
+        ) : loadError ? (
+          <p className="field-error" style={{ padding: '1rem' }} role="alert">{loadError}</p>
         ) : (
           <form className="slide-body" onSubmit={handleSubmit} noValidate>
-            {error && <div className="error" role="alert">{error}</div>}
+            {(submitError || savedMessage) && (
+              <div ref={messageRef}>
+                {submitError && <div className="error" role="alert">{submitError}</div>}
+                {savedMessage && <div className="notice" role="status">{savedMessage}</div>}
+              </div>
+            )}
 
             <fieldset disabled={readOnly}>
               <legend>Account</legend>
 
               <label>Email
                 <input type="email" value={form.email} maxLength={50}
-                  readOnly={mode === 'edit'} disabled={mode === 'edit'}
+                  readOnly={fieldsLocked} disabled={fieldsLocked}
                   aria-invalid={showErrors && !!fieldErrors.email}
                   onChange={(e) => set('email', e.target.value)} />
-                {mode === 'edit' && (
+                {fieldsLocked && (
                   <span className="field-hint">Email cannot be changed after onboarding.</span>
                 )}
                 {showErrors && fieldErrors.email && (
@@ -479,10 +519,10 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               </label>
               <label>Business Name
                 <input value={form.businessName} maxLength={100}
-                  readOnly={mode === 'edit'} disabled={mode === 'edit'}
+                  readOnly={fieldsLocked} disabled={fieldsLocked}
                   aria-invalid={showErrors && !!fieldErrors.businessName}
                   onChange={(e) => set('businessName', e.target.value)} />
-                {mode === 'edit' && (
+                {fieldsLocked && (
                   <span className="field-hint">Business name cannot be changed after onboarding.</span>
                 )}
                 {showErrors && fieldErrors.businessName && (
@@ -492,10 +532,10 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               <label>Business EIN
                 <input value={form.businessEin} inputMode="numeric"
                   placeholder="12-3456789"
-                  readOnly={mode === 'edit'} disabled={mode === 'edit'}
+                  readOnly={fieldsLocked} disabled={fieldsLocked}
                   aria-invalid={showErrors && !!fieldErrors.businessEin}
                   onChange={(e) => set('businessEin', formatEin(e.target.value))} />
-                {mode === 'edit' && (
+                {fieldsLocked && (
                   <span className="field-hint">Business EIN cannot be changed after onboarding.</span>
                 )}
                 {showErrors && fieldErrors.businessEin && (
@@ -723,7 +763,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               <div className="slide-actions">
                 <button type="button" className="ghost" onClick={onClose}>Cancel</button>
                 <button type="submit" disabled={saving}>
-                  {saving ? 'Saving…' : mode === 'add' ? 'Onboard Landlord' : 'Save Changes'}
+                  {saving ? 'Saving…' : mode === 'add' && !isNewlySaved ? 'Onboard Landlord' : 'Save Changes'}
                 </button>
               </div>
             )}

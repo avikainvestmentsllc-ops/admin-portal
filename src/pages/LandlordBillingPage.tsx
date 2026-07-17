@@ -23,6 +23,19 @@ function isoToDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
 }
 
+function packageAddOnNames(p: LandlordPackageView): string {
+  return Array.isArray(p.addOns) && p.addOns.length > 0
+    ? (p.addOns as Array<{ adons_name?: string }>).map((a) => a.adons_name).filter(Boolean).join(', ')
+    : '—';
+}
+
+function planStatusBadgeClass(status: 'Active' | 'Upcoming' | 'Expired' | '—'): string {
+  return status === 'Active' ? 'badge on'
+    : status === 'Upcoming' ? 'badge pending'
+    : status === 'Expired' ? 'badge off'
+    : 'badge';
+}
+
 export default function LandlordBillingPage() {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
@@ -150,59 +163,80 @@ export default function LandlordBillingPage() {
           {sortedPackages.length === 0 ? (
             <p className="muted">No package assigned.</p>
           ) : (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Package</th>
-                    <th>Start</th>
-                    <th>End</th>
-                    <th>Add-ons</th>
-                    <th>Plan</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedPackages.map((p) => {
-                    const status = planStatus(p);
-                    const addOns = Array.isArray(p.addOns) && p.addOns.length > 0
-                      ? (p.addOns as Array<{ adons_name?: string }>)
-                          .map((a) => a.adons_name).filter(Boolean).join(', ')
-                      : '—';
-                    return (
-                      <tr key={p.accountPackageId ?? p.packageStartDate}>
-                        <td>{p.accountPackageName}</td>
-                        <td>{isoToDate(p.packageStartDate)}</td>
-                        <td>{isoToDate(p.packageEndDate)}</td>
-                        <td>{addOns}</td>
-                        <td>
-                          <span className={
-                            status === 'Active' ? 'badge on'
-                              : status === 'Upcoming' ? 'badge pending'
-                              : status === 'Expired' ? 'badge off'
-                              : ''
-                          }>
-                            {status}
-                          </span>
-                        </td>
-                        <td className="actions">
-                          {status === 'Upcoming' && (
-                            <button
-                              className="ghost sm"
-                              title="Edit upcoming plan"
-                              aria-label="Edit upcoming plan"
-                              onClick={() => { setEditSeed(p); setChanging(true); }}
-                            >
-                              ✎
+            <>
+              {/* Desktop: table */}
+              <div className="table-wrap onboarding-desktop">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Package</th>
+                      <th>Start</th>
+                      <th>End</th>
+                      <th>Add-ons</th>
+                      <th>Plan</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedPackages.map((p) => {
+                      const status = planStatus(p);
+                      const addOns = packageAddOnNames(p);
+                      return (
+                        <tr key={p.accountPackageId ?? p.packageStartDate}>
+                          <td>{p.accountPackageName}</td>
+                          <td>{isoToDate(p.packageStartDate)}</td>
+                          <td>{isoToDate(p.packageEndDate)}</td>
+                          <td>{addOns}</td>
+                          <td>
+                            <span className={planStatusBadgeClass(status)}>{status}</span>
+                          </td>
+                          <td className="actions">
+                            {status === 'Upcoming' && (
+                              <button
+                                className="ghost sm"
+                                title="Edit upcoming plan"
+                                aria-label="Edit upcoming plan"
+                                onClick={() => { setEditSeed(p); setChanging(true); }}
+                              >
+                                ✎
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* XS: cards */}
+              <div className="onboarding-cards">
+                {sortedPackages.map((p) => {
+                  const status = planStatus(p);
+                  return (
+                    <div className="ob-card" key={p.accountPackageId ?? p.packageStartDate}>
+                      <div className="ob-card-head" style={{ cursor: 'default' }}>
+                        <div className="ob-card-main">
+                          <span className="ob-card-name">{p.accountPackageName}</span>
+                          <span className="ob-card-cid">{isoToDate(p.packageStartDate)} – {isoToDate(p.packageEndDate)}</span>
+                        </div>
+                        <span className={planStatusBadgeClass(status)}>{status}</span>
+                      </div>
+                      <div className="ob-card-body">
+                        <div className="ob-card-row"><span className="ob-card-label">Add-ons</span><span>{packageAddOnNames(p)}</span></div>
+                        {status === 'Upcoming' && (
+                          <div className="ob-card-actions">
+                            <button className="ghost sm" onClick={() => { setEditSeed(p); setChanging(true); }}>
+                              Edit upcoming plan
                             </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           {/* Billing */}
@@ -210,32 +244,55 @@ export default function LandlordBillingPage() {
           {billing.length === 0 ? (
             <p className="muted">No billing available yet.</p>
           ) : (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Billing Date</th>
-                    <th>Package</th>
-                    <th>Add-ons</th>
-                    <th>Subtotal</th>
-                    <th>Tax</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {billing.map((b) => (
-                    <tr key={b.billingId}>
-                      <td>{isoToDate(b.billingDateUtc)}</td>
-                      <td>{money(b.packageAmount)}</td>
-                      <td>{money(b.adonsAmount)}</td>
-                      <td>{money(b.subTotalAmount)}</td>
-                      <td>{money(b.taxAmount)}</td>
-                      <td>{money(b.totalAmount)}</td>
+            <>
+              {/* Desktop: table */}
+              <div className="table-wrap onboarding-desktop">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Billing Date</th>
+                      <th>Package</th>
+                      <th>Add-ons</th>
+                      <th>Subtotal</th>
+                      <th>Tax</th>
+                      <th>Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {billing.map((b) => (
+                      <tr key={b.billingId}>
+                        <td>{isoToDate(b.billingDateUtc)}</td>
+                        <td>{money(b.packageAmount)}</td>
+                        <td>{money(b.adonsAmount)}</td>
+                        <td>{money(b.subTotalAmount)}</td>
+                        <td>{money(b.taxAmount)}</td>
+                        <td>{money(b.totalAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* XS: cards */}
+              <div className="onboarding-cards">
+                {billing.map((b) => (
+                  <div className="ob-card" key={b.billingId}>
+                    <div className="ob-card-head" style={{ cursor: 'default' }}>
+                      <div className="ob-card-main">
+                        <span className="ob-card-name">{isoToDate(b.billingDateUtc)}</span>
+                        <span className="ob-card-cid">Total {money(b.totalAmount)}</span>
+                      </div>
+                    </div>
+                    <div className="ob-card-body">
+                      <div className="ob-card-row"><span className="ob-card-label">Package</span><span>{money(b.packageAmount)}</span></div>
+                      <div className="ob-card-row"><span className="ob-card-label">Add-ons</span><span>{money(b.adonsAmount)}</span></div>
+                      <div className="ob-card-row"><span className="ob-card-label">Subtotal</span><span>{money(b.subTotalAmount)}</span></div>
+                      <div className="ob-card-row"><span className="ob-card-label">Tax</span><span>{money(b.taxAmount)}</span></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </>
       )}

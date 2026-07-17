@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { forgotPassword, ApiRequestError } from '../api/client';
+import { toAuthUserMessage } from '../api/errorMessages';
 
 // Reset not allowed (locked/inactive) → point the user to support.
 const CONTACT_SUPPORT_CODES = new Set(['80114']);
@@ -20,14 +21,10 @@ export default function ForgotPasswordPage() {
       // Move to the OTP + new-password screen, carrying the email along.
       navigate(`/verify-otp?email=${encodeURIComponent(email.trim())}`, { state: { sent: true } });
     } catch (err) {
-      if (err instanceof ApiRequestError) {
-        setError(
-          CONTACT_SUPPORT_CODES.has(err.errorCode)
-            ? `${err.message} Please contact customer service.`
-            : err.message,
-        );
+      if (err instanceof ApiRequestError && CONTACT_SUPPORT_CODES.has(err.errorCode)) {
+        setError(`${err.message} Please contact customer service.`);
       } else {
-        setError('Unable to reach the server. Please try again.');
+        setError(toAuthUserMessage(err));
       }
     } finally {
       setSubmitting(false);

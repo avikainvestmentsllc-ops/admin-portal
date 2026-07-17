@@ -1,0 +1,41 @@
+# Validation Rules
+  - UI error messsages should be clear and concise, indicating the specific validation issue and should be displayed inline below the input field across all the apps.
+  - All validation rules should be enforced both on the client-side and server-side to ensure data integrity and security.
+
+# Admin-portal
+ - login page
+  - email: valid email address, maximum 50 characters,
+  - password: minimum 8 characters, maximum 100 characters,
+- onboarding page - Add / Edit page
+  - email: valid email address, maximum 50 characters
+  - phone number: valid phone number format (e.g., (123) 456-7890), maximum 15 characters in UI. UI should remove any non-numeric characters and store only the numeric value in the database.
+  - business name: required, maximum 100 characters , allow only letters, numbers, spaces, and basic punctuation (e.g., periods, commas, hyphens)
+  - business EIN: required, valid EIN format (XX-XXXXXXX), maximum 10 characters. Remove any non-numeric characters and store only the numeric value in the database.
+  - address line 1: required, maximum 100 characters
+  - address line 2: optional, maximum 100 characters
+  - city: required, maximum 50 characters, allow only letters and spaces
+  - state: required, must be a valid US state abbreviation (e.g., CA, NY)
+  - zip code: required, valid US ZIP code format (5 digits or 5+4 digits, e.g., 12345 or 12345-6789), maximum 10 characters.
+  - first name: required, maximum 50 characters, allow only letters and spaces
+  - last name: required, maximum 50 characters, allow only letters and spaces
+  - email: required, valid email address, maximum 50 characters
+  - phone number: required, valid phone number format (e.g., (123) 456-7890), maximum 15 characters in UI. UI should remove any non-numeric characters and store only the numeric value in the database.
+  - package selection: required, must be one of the available package options (e.g., Basic, Standard, Premium)
+  - add-ons selection: optional, must be one of the available add-on options (e.g., Extra Storage, Priority Support)
+  - free trial start date: optional, must be a valid date in the future (MM/DD/YYYY format) and not past the current date. 
+  - free trial end date: mandatory if free trial start date is present, must be a valid date in the future (MM/DD/YYYY format).The end date must be after the start date.
+  - package effective start date: required, must be a valid date in the future (MM/DD/YYYY format). If free trial end date is present, the package effective start date must be 1 day after the free trial end date.
+  - billing date: required, must be a valid date in the future (MM/DD/YYYY format). The billing date must be 1 day after the package effective start date.
+- package page - Add / Edit page
+  - package name: required, maximum 50 characters, allow only letters, numbers, spaces, and basic punctuation (e.g., periods, commas, hyphens)
+  - package description: optional, maximum 200 characters
+  - package price: required, must be a valid positive decimal number with up to two decimal places (e.g., 9.99)
+  - package effective start date: required, must be a valid date in the future (MM/DD/YYYY format)
+  - package effective end date: optional, must be a valid date in the future (MM/DD/YYYY format). If present, the end date must be after the start date.
+- add-ons page - Add / Edit page
+  - add-on name: required, maximum 50 characters, allow only letters, numbers, spaces, and basic punctuation (e.g., periods, commas, hyphens)
+  - add-on description: optional, maximum 200 characters
+  - add-on price: required, must be a valid positive decimal number with up to two decimal places (e.g., 4.99)
+  - add-on effective start date: required, must be a valid date in the future (MM/DD/YYYY format)
+  - add-on effective end date: optional, must be a valid date in the future (MM/DD/YYYY format). If present, the end date must be after the start date.
+  - add-on count: a positive integer, required, must be greater than 0 and less than or equal to 10000.

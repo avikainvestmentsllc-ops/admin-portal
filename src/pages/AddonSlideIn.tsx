@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { addAddon, updateAddon, ApiRequestError } from '../api/client';
+import { addAddon, updateAddon } from '../api/client';
+import { toUserMessage } from '../api/errorMessages';
 import type { AddonRequest, AddonView, PackageView } from '../api/types';
 import InfoTip from '../components/InfoTip';
 
@@ -59,9 +60,14 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
   const [showErrors, setShowErrors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Set once a save succeeds; the panel stays open so the user sees this instead of auto-closing.
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  // Id of the add-on created by this panel's own add, once saved — further submits update it.
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
-  const title = mode === 'add' ? 'Add Add-on' : 'Edit Add-on';
-  const isAdd = mode === 'add';
+  // Once a new add-on has been created, its locked fields behave like an existing one's.
+  const isAdd = mode === 'add' && !createdId;
+  const title = isAdd ? 'Add Add-on' : 'Edit Add-on';
   const today = todayInput();
 
   // Per-field validation messages (empty string = valid). Future-date checks apply only
@@ -113,6 +119,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setSavedMessage(null);
     if (hasErrors) {
       setShowErrors(true);
       return;
@@ -129,14 +136,20 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
         adonsStartTimeUtc: dateInputToIso(startDate) ?? '',
         adonsEndTimeUtc: dateInputToIso(endDate),
       };
-      if (mode === 'add') {
-        await addAddon(body);
-      } else if (addon) {
-        await updateAddon(addon.adonsId, body);
+      if (isAdd) {
+        const created = await addAddon(body);
+        setCreatedId(created.adonsId);
+        setSavedMessage('Add-on added successfully.');
+      } else {
+        const id = createdId ?? addon?.adonsId;
+        if (id) {
+          await updateAddon(id, body);
+          setSavedMessage('Add-on saved successfully.');
+        }
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? `${err.message} (${err.errorCode})` : 'Save failed');
+      setError(toUserMessage(err));
     } finally {
       setSaving(false);
     }
@@ -152,12 +165,14 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
 
         <form className="slide-body" onSubmit={handleSubmit} noValidate>
           {error && <div className="error" role="alert">{error}</div>}
+          {savedMessage && <div className="notice" role="status">{savedMessage}</div>}
 
           <fieldset>
             <legend>Add-on</legend>
 
             <label>Package
               <select value={adonsPackageId}
+                disabled={!isAdd}
                 aria-invalid={showErrors && !!fieldErrors.adonsPackageId}
                 onChange={(e) => setAdonsPackageId(e.target.value)}>
                 <option value="" disabled>Select a package…</option>
@@ -165,6 +180,9 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
                   <option key={p.packageId} value={p.packageId}>{p.packageName}</option>
                 ))}
               </select>
+              {!isAdd && (
+                <span className="field-hint">Package cannot be changed after creation.</span>
+              )}
               {showErrors && fieldErrors.adonsPackageId && (
                 <span className="field-error">{fieldErrors.adonsPackageId}</span>
               )}
@@ -172,8 +190,12 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
 
             <label>Name
               <input value={adonsName} maxLength={50}
+                readOnly={!isAdd} disabled={!isAdd}
                 aria-invalid={showErrors && !!fieldErrors.adonsName}
                 onChange={(e) => setAdonsName(e.target.value)} />
+              {!isAdd && (
+                <span className="field-hint">Name cannot be changed after creation.</span>
+              )}
               {showErrors && fieldErrors.adonsName && (
                 <span className="field-error">{fieldErrors.adonsName}</span>
               )}
@@ -182,7 +204,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
             <label>Description
               <textarea rows={3} value={adonsDescription} maxLength={200}
                 aria-invalid={showErrors && !!fieldErrors.adonsDescription}
-                onChange={(e) => setAdonsDescription(e.target.value)} />
+                onChange={(e) => { setAdonsDescription(e.target.value); setSavedMessage(null); setError(null); }} />
               {showErrors && fieldErrors.adonsDescription && (
                 <span className="field-error">{fieldErrors.adonsDescription}</span>
               )}
@@ -191,8 +213,12 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
             <div className="row-2">
               <label>Count
                 <input type="number" min="0" max="10000" step="1" value={adonsCount}
+                  readOnly={!isAdd} disabled={!isAdd}
                   aria-invalid={showErrors && !!fieldErrors.adonsCount}
                   onChange={(e) => setAdonsCount(e.target.value)} />
+                {!isAdd && (
+                  <span className="field-hint">Count cannot be changed after creation.</span>
+                )}
                 {showErrors && fieldErrors.adonsCount && (
                   <span className="field-error">{fieldErrors.adonsCount}</span>
                 )}
@@ -200,8 +226,12 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
               <label>Price
                 <input type="number" min="0" step="0.01" value={adonsPrice}
                   placeholder="0.00"
+                  readOnly={!isAdd} disabled={!isAdd}
                   aria-invalid={showErrors && !!fieldErrors.adonsPrice}
                   onChange={(e) => setAdonsPrice(e.target.value)} />
+                {!isAdd && (
+                  <span className="field-hint">Price cannot be changed after creation.</span>
+                )}
                 {showErrors && fieldErrors.adonsPrice && (
                   <span className="field-error">{fieldErrors.adonsPrice}</span>
                 )}
@@ -211,8 +241,12 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
             <div className="row-2">
               <label>Start
                 <input type="date" value={startDate}
+                  readOnly={!isAdd} disabled={!isAdd}
                   aria-invalid={showErrors && !!fieldErrors.startDate}
                   onChange={(e) => setStartDate(e.target.value)} />
+                {!isAdd && (
+                  <span className="field-hint">Start date cannot be changed after creation.</span>
+                )}
                 {showErrors && fieldErrors.startDate && (
                   <span className="field-error">{fieldErrors.startDate}</span>
                 )}
@@ -224,7 +258,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
                 </span>
                 <input type="date" value={endDate}
                   aria-invalid={showErrors && !!fieldErrors.endDate}
-                  onChange={(e) => setEndDate(e.target.value)} />
+                  onChange={(e) => { setEndDate(e.target.value); setSavedMessage(null); setError(null); }} />
                 {showErrors && fieldErrors.endDate && (
                   <span className="field-error">{fieldErrors.endDate}</span>
                 )}
@@ -233,7 +267,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
 
             <label className="checkbox">
               <input type="checkbox" checked={adonsStatus}
-                onChange={(e) => setAdonsStatus(e.target.checked)} />
+                onChange={(e) => { setAdonsStatus(e.target.checked); setSavedMessage(null); setError(null); }} />
               Active
             </label>
           </fieldset>
@@ -241,7 +275,7 @@ export default function AddonSlideIn({ mode, addon, packages, onClose, onSaved }
           <div className="slide-actions">
             <button type="button" className="ghost" onClick={onClose}>Cancel</button>
             <button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : mode === 'add' ? 'Add Add-on' : 'Save Changes'}
+              {saving ? 'Saving…' : isAdd ? 'Add Add-on' : 'Save Changes'}
             </button>
           </div>
         </form>

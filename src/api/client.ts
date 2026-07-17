@@ -4,7 +4,7 @@ import type {
   AddonView,
   ApiError,
   ChangePackageRequest,
-  LandlordAccountView,
+  LandlordAccountPage,
   LandlordBillingResponse,
   LandlordDetailsResponse,
   LoginResponse,
@@ -150,8 +150,16 @@ async function authJson<T>(url: string, init: RequestInit = {}): Promise<T> {
 
 // ---------- Onboarding API ----------
 
-export function listLandlords(): Promise<LandlordAccountView[]> {
-  return authJson<LandlordAccountView[]>(`${ONBOARDING}/list`);
+/**
+ * `search` matches customer id, business name, email, phone or EIN (partial, case-insensitive).
+ * `page` is zero-based; the backend returns 20 accounts per page.
+ */
+export function listLandlords(search?: string, page = 0): Promise<LandlordAccountPage> {
+  const params = new URLSearchParams();
+  if (search?.trim()) params.set('search', search.trim());
+  if (page > 0) params.set('page', String(page));
+  const query = params.toString();
+  return authJson<LandlordAccountPage>(`${ONBOARDING}/list${query ? `?${query}` : ''}`);
 }
 
 export function listPackages(): Promise<PackageOption[]> {

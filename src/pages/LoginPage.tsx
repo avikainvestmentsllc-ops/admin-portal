@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { ApiRequestError } from '../api/client';
+import { toAuthUserMessage } from '../api/errorMessages';
 
 // Account locked or inactive → tell the user to contact support (no self-service).
 const CONTACT_SUPPORT_CODES = new Set(['80115', '80116']);
@@ -53,15 +54,11 @@ export default function LoginPage() {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
-      if (err instanceof ApiRequestError) {
-        // Locked/inactive accounts get a support message; other errors show as-is.
-        setError(
-          CONTACT_SUPPORT_CODES.has(err.errorCode)
-            ? `${err.message} Please contact customer service.`
-            : err.message,
-        );
+      if (err instanceof ApiRequestError && CONTACT_SUPPORT_CODES.has(err.errorCode)) {
+        // Locked/inactive accounts get a support message.
+        setError(`${err.message} Please contact customer service.`);
       } else {
-        setError('Unable to reach the server. Please try again.');
+        setError(toAuthUserMessage(err));
       }
     } finally {
       setSubmitting(false);

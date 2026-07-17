@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { addPackage, updatePackage, ApiRequestError } from '../api/client';
+import { addPackage, updatePackage } from '../api/client';
+import { toUserMessage } from '../api/errorMessages';
 import type { PackageRequest, PackageView } from '../api/types';
 import InfoTip from '../components/InfoTip';
 
@@ -52,11 +53,17 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
   const [effectiveEnd, setEffectiveEnd] = useState(isoToDateInput(pkg?.effectiveEndDateUtc));
 
   const [showErrors, setShowErrors] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Set once a save succeeds; the panel stays open so the user sees this instead of auto-closing.
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  // Id of the package created by this panel's own add, once saved — further submits update it.
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
-  const title = mode === 'add' ? 'Add Package' : 'Edit Package';
-  const isAdd = mode === 'add';
+  // Once a new package has been created, its name/price/start lock just like an existing one,
+  // and the panel effectively behaves like an edit for any further changes.
+  const isAdd = mode === 'add' && !createdId;
+  const title = isAdd ? 'Add Package' : 'Edit Package';
   const today = todayInput();
 
   // Per-field validation messages (empty string = valid). Future-date checks apply only
@@ -93,7 +100,8 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    setSubmitError(null);
+    setSavedMessage(null);
     if (hasFieldErrors) {
       setShowErrors(true);
       return;
@@ -108,14 +116,20 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
         effectiveStartDateUtc: dateInputToIso(effectiveStart),
         effectiveEndDateUtc: dateInputToIso(effectiveEnd),
       };
-      if (mode === 'add') {
-        await addPackage(body);
-      } else if (pkg) {
-        await updatePackage(pkg.packageId, body);
+      if (isAdd) {
+        const created = await addPackage(body);
+        setCreatedId(created.packageId);
+        setSavedMessage('Package added successfully.');
+      } else {
+        const id = createdId ?? pkg?.packageId;
+        if (id) {
+          await updatePackage(id, body);
+          setSavedMessage('Package saved successfully.');
+        }
       }
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? `${err.message} (${err.errorCode})` : 'Save failed');
+      setSubmitError(toUserMessage(err));
     } finally {
       setSaving(false);
     }
@@ -130,15 +144,20 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
         </div>
 
         <form className="slide-body" onSubmit={handleSubmit} noValidate>
-          {error && <div className="error" role="alert">{error}</div>}
+          {submitError && <div className="error" role="alert">{submitError}</div>}
+          {savedMessage && <div className="notice" role="status">{savedMessage}</div>}
 
           <fieldset>
             <legend>Package</legend>
 
             <label>Name
               <input value={packageName} maxLength={50}
+                readOnly={!isAdd} disabled={!isAdd}
                 aria-invalid={showErrors && !!fieldErrors.packageName}
                 onChange={(e) => setPackageName(e.target.value)} />
+              {!isAdd && (
+                <span className="field-hint">Package name cannot be changed after creation.</span>
+              )}
               {showErrors && fieldErrors.packageName && (
                 <span className="field-error">{fieldErrors.packageName}</span>
               )}
@@ -147,7 +166,7 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
             <label>Description
               <textarea rows={3} value={packageDescription} maxLength={200}
                 aria-invalid={showErrors && !!fieldErrors.packageDescription}
-                onChange={(e) => setPackageDescription(e.target.value)} />
+                onChange={(e) => { setPackageDescription(e.target.value); setSavedMessage(null); setSubmitError(null); }} />
               {showErrors && fieldErrors.packageDescription && (
                 <span className="field-error">{fieldErrors.packageDescription}</span>
               )}
@@ -156,8 +175,12 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
             <label>Price (monthly)
               <input type="number" min="0" step="0.01" value={packagePrice}
                 placeholder="0.00"
+                readOnly={!isAdd} disabled={!isAdd}
                 aria-invalid={showErrors && !!fieldErrors.packagePrice}
                 onChange={(e) => setPackagePrice(e.target.value)} />
+              {!isAdd && (
+                <span className="field-hint">Price cannot be changed after creation.</span>
+              )}
               {showErrors && fieldErrors.packagePrice && (
                 <span className="field-error">{fieldErrors.packagePrice}</span>
               )}
@@ -166,8 +189,12 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
             <div className="row-2">
               <label>Effective Start
                 <input type="date" value={effectiveStart}
+                  readOnly={!isAdd} disabled={!isAdd}
                   aria-invalid={showErrors && !!fieldErrors.effectiveStart}
                   onChange={(e) => setEffectiveStart(e.target.value)} />
+                {!isAdd && (
+                  <span className="field-hint">Effective start date cannot be changed after creation.</span>
+                )}
                 {showErrors && fieldErrors.effectiveStart && (
                   <span className="field-error">{fieldErrors.effectiveStart}</span>
                 )}
@@ -179,7 +206,7 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
                 </span>
                 <input type="date" value={effectiveEnd}
                   aria-invalid={showErrors && !!fieldErrors.effectiveEnd}
-                  onChange={(e) => setEffectiveEnd(e.target.value)} />
+                  onChange={(e) => { setEffectiveEnd(e.target.value); setSavedMessage(null); setSubmitError(null); }} />
                 {showErrors && fieldErrors.effectiveEnd && (
                   <span className="field-error">{fieldErrors.effectiveEnd}</span>
                 )}
@@ -192,7 +219,7 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
 
             <label className="checkbox">
               <input type="checkbox" checked={packageStatus}
-                onChange={(e) => setPackageStatus(e.target.checked)} />
+                onChange={(e) => { setPackageStatus(e.target.checked); setSavedMessage(null); setSubmitError(null); }} />
               Active
             </label>
           </fieldset>
@@ -200,7 +227,7 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
           <div className="slide-actions">
             <button type="button" className="ghost" onClick={onClose}>Cancel</button>
             <button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : mode === 'add' ? 'Add Package' : 'Save Changes'}
+              {saving ? 'Saving…' : isAdd ? 'Add Package' : 'Save Changes'}
             </button>
           </div>
         </form>

@@ -588,6 +588,49 @@ body {
   transform: scale(0.96);
 }
 
+/* ---------- Search bar ---------- */
+.search-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.search-bar input {
+  flex: 1;
+  min-width: 0;
+  max-width: 22rem;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.75rem;
+  color: var(--on-surface);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.search-bar input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(128, 131, 255, 0.35);
+}
+
+.search-bar button {
+  flex-shrink: 0;
+}
+
+/* ---------- Pagination ---------- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.pagination-status {
+  font-size: 0.85rem;
+}
+
 .ghost {
   background: transparent;
   border: 1px solid var(--outline-variant);
@@ -611,6 +654,12 @@ body {
 
 .content.wide {
   max-width: var(--container-max, 1440px);
+}
+
+/* Pages whose table needs the full viewport (e.g. Onboarding's wide, many-column table). */
+.content.full-width {
+  max-width: none;
+  width: 100%;
 }
 
 .muted {

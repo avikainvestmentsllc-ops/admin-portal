@@ -1,0 +1,2 @@
+## automation
+- uses playwright automation

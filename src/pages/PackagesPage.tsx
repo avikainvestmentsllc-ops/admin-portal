@@ -82,8 +82,8 @@ export default function PackagesPage() {
     setSlideMode(null);
     setSelected(null);
   };
+  // Keep the slide-in open on success (it shows its own success message); just refresh the list.
   const onSaved = () => {
-    closeSlide();
     void load();
   };
 

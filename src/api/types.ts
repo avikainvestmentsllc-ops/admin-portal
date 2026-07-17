@@ -61,8 +61,18 @@ export interface LandlordAccountView {
   businessAddress: BusinessAddress | null;
   businessContact: BusinessContact | null;
   accountStatus: boolean;
+  packageName: string | null;
   createTimeUtc: string;
   updateTimeUtc: string;
+}
+
+/** One page of the onboarding accounts list; `page` is zero-based. */
+export interface LandlordAccountPage {
+  content: LandlordAccountView[];
+  page: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
 }
 
 export interface LandlordPackageView {
