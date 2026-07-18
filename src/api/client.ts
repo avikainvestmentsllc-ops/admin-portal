@@ -152,7 +152,7 @@ async function authJson<T>(url: string, init: RequestInit = {}): Promise<T> {
 
 /**
  * `search` matches customer id, business name, email, phone or EIN (partial, case-insensitive).
- * `page` is zero-based; the backend returns 20 accounts per page.
+ * `page` is zero-based; the backend returns 10 accounts per page.
  */
 export function listLandlords(search?: string, page = 0): Promise<LandlordAccountPage> {
   const params = new URLSearchParams();

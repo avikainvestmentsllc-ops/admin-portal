@@ -84,7 +84,7 @@ export default function OnboardingPage() {
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
 
-  // Zero-based; the backend returns one page (20 accounts) at a time.
+  // Zero-based; the backend returns one page (10 accounts) at a time.
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
