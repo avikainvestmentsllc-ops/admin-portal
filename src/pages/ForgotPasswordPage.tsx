@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@houselease.com"
+            placeholder="admin@myhouselease.com"
             required
           />
 
