@@ -136,8 +136,8 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
   }
 
   return (
-    <div className="slide-overlay" onClick={onClose}>
-      <aside className="slide-panel" onClick={(e) => e.stopPropagation()}>
+    <div className="slide-overlay">
+      <aside className="slide-panel">
         <div className="slide-head">
           <h3>{title}</h3>
           <button className="ghost" onClick={onClose} aria-label="Close">✕</button>

@@ -101,8 +101,8 @@ export default function ChangePackageSlideIn({ accountId, current, options, onCl
   }
 
   return (
-    <div className="slide-overlay" onClick={onClose}>
-      <aside className="slide-panel" onClick={(e) => e.stopPropagation()}>
+    <div className="slide-overlay">
+      <aside className="slide-panel">
         <div className="slide-head">
           <h3>Change Package</h3>
           <button className="ghost" onClick={onClose} aria-label="Close">✕</button>

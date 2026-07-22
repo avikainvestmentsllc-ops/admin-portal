@@ -356,12 +356,12 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
         ? 'Phone number must be 10 digits, e.g. (214) 555-9090'
         : '',
     packageId: isAdd && !form.packageId ? 'Please select a package' : '',
-    // Package start (effective) is mandatory; billing date derives from it. Future-date
+    // Package start (effective) is mandatory; billing date derives from it. Today-or-future
     // only enforced on add — editing an already-started package must remain possible.
     packageStartDate: !effectivePackageStart
       ? 'Package start date is required'
-      : isAdd && effectivePackageStart <= today
-        ? 'Package start date must be in the future'
+      : isAdd && effectivePackageStart < today
+        ? 'Package start date must be today or a future date'
         : '',
     // A free-trial start requires a free-trial end date, and (on add) both must be future
     // dates with the end after the start.
@@ -473,8 +473,8 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
   }
 
   return (
-    <div className="slide-overlay" onClick={onClose}>
-      <aside className="slide-panel" onClick={(e) => e.stopPropagation()}>
+    <div className="slide-overlay">
+      <aside className="slide-panel">
         <div className="slide-head">
           <h3>{title}</h3>
           <button className="ghost" onClick={onClose} aria-label="Close">✕</button>
