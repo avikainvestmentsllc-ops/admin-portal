@@ -85,7 +85,6 @@ export default function LoginPage() {
             value={email}
             aria-invalid={showErrors && !!fieldErrors.email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@myhouselease.com"
           />
           {showErrors && fieldErrors.email && (
             <span className="field-error">{fieldErrors.email}</span>
@@ -100,7 +99,6 @@ export default function LoginPage() {
             value={password}
             aria-invalid={showErrors && !!fieldErrors.password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
           />
           {showErrors && fieldErrors.password && (
             <span className="field-error">{fieldErrors.password}</span>
