@@ -11,6 +11,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import PackagesPage from './pages/PackagesPage';
 import AddonsPage from './pages/AddonsPage';
 import LandlordBillingPage from './pages/LandlordBillingPage';
+import MileageRatesPage from './pages/MileageRatesPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/onboarding/:accountId" element={<LandlordBillingPage />} />
             <Route path="/packages" element={<PackagesPage />} />
             <Route path="/addons" element={<AddonsPage />} />
+            <Route path="/mileage-rates" element={<MileageRatesPage />} />
           </Route>
           {/* /dashboard is the default landing page after login */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

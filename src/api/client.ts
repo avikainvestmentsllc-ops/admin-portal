@@ -9,6 +9,8 @@ import type {
   LandlordDetailsResponse,
   LoginResponse,
   MessageResponse,
+  MileageRateRequest,
+  MileageRateView,
   OnboardLandlordRequest,
   PackageOption,
   PackageRequest,
@@ -25,6 +27,7 @@ const BASE = `${API_BASE}/managehouselease/adminportal`;
 const ONBOARDING = `${API_BASE}/managehouselease/onboarding`;
 const PACKAGES = `${API_BASE}/managehouselease/packages`;
 const ADDONS = `${API_BASE}/managehouselease/addons`;
+const MILEAGE_RATES = `${API_BASE}/managehouselease/mileage-rates`;
 
 export class ApiRequestError extends Error {
   errorCode: string;
@@ -236,6 +239,26 @@ export function addAddon(body: AddonRequest): Promise<AddonView> {
 
 export function updateAddon(adonsId: string, body: AddonRequest): Promise<AddonView> {
   return authJson<AddonView>(`${ADDONS}/${adonsId}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------- IRS mileage rate API ----------
+
+export function listAllMileageRates(): Promise<MileageRateView[]> {
+  return authJson<MileageRateView[]>(`${MILEAGE_RATES}/list`);
+}
+
+export function addMileageRate(body: MileageRateRequest): Promise<MileageRateView> {
+  return authJson<MileageRateView>(`${MILEAGE_RATES}/add`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateMileageRate(mileageRateId: string, body: MileageRateRequest): Promise<MileageRateView> {
+  return authJson<MileageRateView>(`${MILEAGE_RATES}/${mileageRateId}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   });

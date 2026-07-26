@@ -182,6 +182,21 @@ export interface AddonRequest {
   adonsEndTimeUtc: string | null;
 }
 
+// ---------- IRS mileage rate (irs_mileage_rate) ----------
+
+export interface MileageRateView {
+  mileageRateId: string;
+  taxYear: number;
+  ratePerMile: number;
+  createTimeUtc: string | null;
+  updateTimeUtc: string | null;
+}
+
+export interface MileageRateRequest {
+  taxYear: number;
+  ratePerMile: number;
+}
+
 /** Shape persisted into landlord_account_package.add_ons (JSON array). */
 export interface SelectedAddon {
   adons_id: string;
