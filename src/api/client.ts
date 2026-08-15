@@ -4,6 +4,9 @@ import type {
   AddonView,
   ApiError,
   ChangePackageRequest,
+  ContractorDetailView,
+  ContractorUpdateRequest,
+  ContractorView,
   LandlordAccountPage,
   LandlordBillingResponse,
   LandlordDetailsResponse,
@@ -28,6 +31,7 @@ const ONBOARDING = `${API_BASE}/managehouselease/onboarding`;
 const PACKAGES = `${API_BASE}/managehouselease/packages`;
 const ADDONS = `${API_BASE}/managehouselease/addons`;
 const MILEAGE_RATES = `${API_BASE}/managehouselease/mileage-rates`;
+const CONTRACTORS = `${API_BASE}/managehouselease/contractors`;
 
 export class ApiRequestError extends Error {
   errorCode: string;
@@ -259,6 +263,23 @@ export function addMileageRate(body: MileageRateRequest): Promise<MileageRateVie
 
 export function updateMileageRate(mileageRateId: string, body: MileageRateRequest): Promise<MileageRateView> {
   return authJson<MileageRateView>(`${MILEAGE_RATES}/${mileageRateId}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------- Contractor API ----------
+
+export function listAllContractors(): Promise<ContractorView[]> {
+  return authJson<ContractorView[]>(`${CONTRACTORS}/list`);
+}
+
+export function getContractor(contractorId: string): Promise<ContractorDetailView> {
+  return authJson<ContractorDetailView>(`${CONTRACTORS}/${contractorId}`);
+}
+
+export function updateContractor(contractorId: string, body: ContractorUpdateRequest): Promise<ContractorDetailView> {
+  return authJson<ContractorDetailView>(`${CONTRACTORS}/${contractorId}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   });

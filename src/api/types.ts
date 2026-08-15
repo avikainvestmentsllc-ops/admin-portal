@@ -197,6 +197,46 @@ export interface MileageRateRequest {
   ratePerMile: number;
 }
 
+export interface ContractorView {
+  contractorId: string;
+  companyName: string | null;
+  contactFirstName: string | null;
+  contactLastName: string | null;
+  phoneNumber: string | null;
+  email: string | null;
+  isActive: boolean | null;
+}
+
+/** cities + radius only — zipcodes isn't collected here, matching contractor-ui's own self-edit form. */
+export interface ContractorServiceArea {
+  cities: string[] | null;
+  radiusMiles: number | null;
+}
+
+export interface ContractorDetailView {
+  contractorId: string;
+  companyName: string | null;
+  contactFirstName: string | null;
+  contactLastName: string | null;
+  phoneNumber: string | null;
+  email: string | null;
+  specialties: string[];
+  serviceArea: ContractorServiceArea | null;
+  licenseNumber: string | null;
+  insuranceProvider: string | null;
+  insurancePolicyNumber: string | null;
+  isActive: boolean | null;
+}
+
+export interface ContractorUpdateRequest {
+  specialties: string[];
+  serviceArea: ContractorServiceArea | null;
+  licenseNumber: string | null;
+  insuranceProvider: string | null;
+  insurancePolicyNumber: string | null;
+  isActive: boolean;
+}
+
 /** Shape persisted into landlord_account_package.add_ons (JSON array). */
 export interface SelectedAddon {
   adons_id: string;

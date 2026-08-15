@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { label: 'Packages', short: 'Plans', to: '/packages', icon: 'inventory_2' },
   { label: 'Add-ons', short: 'Add-ons', to: '/addons', icon: 'extension' },
   { label: 'Mileage Rates', short: 'Mileage', to: '/mileage-rates', icon: 'directions_car' },
+  { label: 'Contractors', short: 'Contractors', to: '/contractors', icon: 'engineering' },
 ];
 
 function initials(first?: string, last?: string): string {

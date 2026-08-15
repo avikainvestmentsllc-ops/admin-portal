@@ -12,6 +12,7 @@ import PackagesPage from './pages/PackagesPage';
 import AddonsPage from './pages/AddonsPage';
 import LandlordBillingPage from './pages/LandlordBillingPage';
 import MileageRatesPage from './pages/MileageRatesPage';
+import ContractorsPage from './pages/ContractorsPage';
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/packages" element={<PackagesPage />} />
             <Route path="/addons" element={<AddonsPage />} />
             <Route path="/mileage-rates" element={<MileageRatesPage />} />
+            <Route path="/contractors" element={<ContractorsPage />} />
           </Route>
           {/* /dashboard is the default landing page after login */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
