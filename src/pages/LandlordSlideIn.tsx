@@ -13,6 +13,7 @@ import type {
   SelectedAddon,
   UpdateLandlordRequest,
 } from '../api/types';
+import { loadGoogleMaps, getComponent } from '../utils/googleMaps';
 
 export type SlideMode = 'view' | 'edit' | 'add';
 
@@ -232,6 +233,56 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
     setForm((f) => ({ ...f, [key]: value }));
     setSavedMessage(null);
   };
+
+  // ── Google Places autocomplete on the Address Line 1 field ─────────────────
+  const addressInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (readOnly) return;
+    let listener: { remove: () => void } | undefined;
+    loadGoogleMaps()
+      .then((maps) => {
+        if (!addressInputRef.current) return;
+        const autocomplete = new maps.places.Autocomplete(addressInputRef.current, {
+          types: ['address'],
+          componentRestrictions: { country: 'us' },
+          fields: ['address_components'],
+        });
+        listener = autocomplete.addListener('place_changed', () => {
+          const components = autocomplete.getPlace().address_components;
+          if (!components) return;
+
+          const streetNumber = getComponent(components, 'street_number')?.long_name ?? '';
+          const route = getComponent(components, 'route')?.long_name ?? '';
+          const city =
+            getComponent(components, 'locality')?.long_name ??
+            getComponent(components, 'sublocality')?.long_name ??
+            getComponent(components, 'postal_town')?.long_name ??
+            '';
+          const state = getComponent(components, 'administrative_area_level_1')?.short_name ?? '';
+          const zipCode = getComponent(components, 'postal_code')?.long_name ?? '';
+
+          setForm((f) => ({
+            ...f,
+            addressLine1: [streetNumber, route].filter(Boolean).join(' '),
+            city,
+            state: state && US_STATES.includes(state) ? state : f.state,
+            zipCode,
+          }));
+          setSavedMessage(null);
+        });
+        // Suppress the browser's native suggestion dropdown so it doesn't overlap Google's.
+        addressInputRef.current.setAttribute('autocomplete', 'off');
+      })
+      .catch(() => {
+        // No key configured or the script failed to load — the field silently stays a plain input.
+      });
+
+    return () => {
+      listener?.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly]);
 
   // The package chosen in the dropdown (add mode) — its addOns drive the selectable list.
   const selectedPackage = useMemo(
@@ -543,7 +594,8 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                 )}
               </label>
               <label>Address Line 1
-                <input value={form.addressLine1} maxLength={100}
+                <input ref={addressInputRef} value={form.addressLine1} maxLength={100}
+                  placeholder="Start typing an address…" autoComplete="off"
                   aria-invalid={showErrors && !!fieldErrors.addressLine1}
                   onChange={(e) => set('addressLine1', e.target.value)} />
                 {showErrors && fieldErrors.addressLine1 && (
