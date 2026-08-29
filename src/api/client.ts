@@ -20,6 +20,7 @@ import type {
   PackageView,
   ResetTokenInfo,
   UpdateLandlordRequest,
+  DashboardSummary,
 } from './types';
 
 // Backend origin. Empty in dev so the Vite proxy handles /managehouselease/*; set to the
@@ -28,6 +29,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
 const BASE = `${API_BASE}/managehouselease/adminportal`;
 const ONBOARDING = `${API_BASE}/managehouselease/onboarding`;
+const DASHBOARD = `${API_BASE}/managehouselease/dashboard`;
 const PACKAGES = `${API_BASE}/managehouselease/packages`;
 const ADDONS = `${API_BASE}/managehouselease/addons`;
 const MILEAGE_RATES = `${API_BASE}/managehouselease/mileage-rates`;
@@ -153,6 +155,13 @@ async function authJson<T>(url: string, init: RequestInit = {}): Promise<T> {
     throw new ApiRequestError(res.status, await parseError(res));
   }
   return (await res.json()) as T;
+}
+
+// ---------- Dashboard ----------
+
+/** Counts, MRR, 12-month revenue, package mix and the needs-attention feed in one read. */
+export function getDashboardSummary(): Promise<DashboardSummary> {
+  return authJson<DashboardSummary>(`${DASHBOARD}/summary`);
 }
 
 // ---------- Onboarding API ----------

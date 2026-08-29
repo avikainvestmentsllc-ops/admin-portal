@@ -280,3 +280,30 @@ export interface UpdateLandlordRequest {
   billingDate?: string | null;
   billingStatus?: boolean;
 }
+
+// ---------- Dashboard ----------
+
+export interface DashboardMonthRevenue { month: string; packages: number; addons: number; }
+export interface DashboardPackageMix { packageId: string; packageName: string; price: number; accounts: number; }
+export interface DashboardAttentionItem {
+  kind: 'INACTIVE_LANDLORD' | 'EXPIRING_ADDON' | 'INACTIVE_CONTRACTOR' | 'MISSING_MILEAGE_RATE' | string;
+  label: string;
+  detail: string;
+  tag: string;
+  targetId: string | null;
+}
+export interface DashboardSummary {
+  totalLandlords: number;
+  activeLandlords: number;
+  inactiveLandlords: number;
+  registeredContractors: number;
+  activeContractors: number;
+  totalPackages: number;
+  activePackages: number;
+  totalAddons: number;
+  activeAddons: number;
+  monthlyRecurringRevenue: number;
+  revenue: DashboardMonthRevenue[];
+  packageMix: DashboardPackageMix[];
+  attention: DashboardAttentionItem[];
+}
