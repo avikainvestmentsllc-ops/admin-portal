@@ -65,7 +65,10 @@ export function loadGoogleMaps(): Promise<GoogleMapsNamespace> {
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&callback=${callbackName}&loading=async`;
     script.async = true;
-    script.onerror = () => reject(new Error('Failed to load Google Maps.'));
+    script.onerror = () => {
+      console.warn('Address autocomplete is off: the Google Maps script failed to load (check the key\'s HTTP-referrer restrictions and that the Maps JavaScript API + Places API are enabled).')
+      reject(new Error('Failed to load Google Maps.'))
+    };
     document.head.appendChild(script);
   });
 

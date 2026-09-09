@@ -144,20 +144,6 @@ const EMPTY: FormState = {
   freeTrialEndDate: '', billingDate: '', billingStatus: false,
 };
 
-/** Parse the account-package add_ons JSON into typed selected add-ons. */
-function parseSelectedAddons(raw: unknown): SelectedAddon[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null)
-    .map((x) => ({
-      adons_id: String(x.adons_id ?? ''),
-      adons_package_id: String(x.adons_package_id ?? ''),
-      adons_name: String(x.adons_name ?? ''),
-      adons_count: Number(x.adons_count ?? 0),
-      adons_price: Number(x.adons_price ?? 0),
-    }));
-}
-
 export default function LandlordSlideIn({ mode, accountId, packages, onClose, onSaved }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [loading, setLoading] = useState(mode !== 'add');
@@ -201,19 +187,19 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           phoneNumber: formatPhone(a.phoneNumber),
           businessName: a.businessName,
           businessEin: formatEin(a.businessEin),
-          addressLine1: a.businessAddress?.address_line1 ?? '',
-          addressLine2: a.businessAddress?.address_line2 ?? '',
-          city: a.businessAddress?.City ?? '',
-          state: a.businessAddress?.State ?? '',
-          zipCode: a.businessAddress?.ZipCode ?? '',
+          addressLine1: a.businessAddress?.addressLine1 ?? '',
+          addressLine2: a.businessAddress?.addressLine2 ?? '',
+          city: a.businessAddress?.city ?? '',
+          state: a.businessAddress?.state ?? '',
+          zipCode: a.businessAddress?.zipCode ?? '',
           contactFirstName: a.businessContact?.firstName ?? '',
           contactLastName: a.businessContact?.lastName ?? '',
           contactEmail: a.businessContact?.email ?? '',
           contactPhoneNumber: formatPhone(a.businessContact?.phoneNumber ?? ''),
           accountStatus: a.accountStatus,
-          packageId: '',
+          packageId: p?.packageId ?? '',
           packageName: p?.accountPackageName ?? '',
-          selectedAddons: parseSelectedAddons(p?.addOns),
+          selectedAddons: p?.addOns ?? [],
           packageStartDate: isoToLocalInput(p?.packageStartDate),
           packageEndDate: isoToLocalInput(p?.packageEndDate),
           freeTrialStartDate: isoToLocalInput(p?.freeTrialStartDate),
@@ -291,23 +277,17 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
   );
 
   const isAddonSelected = (adonsId: string) =>
-    form.selectedAddons.some((a) => a.adons_id === adonsId);
+    form.selectedAddons.some((a) => a.id === adonsId);
 
   // Toggle an add-on on/off, defaulting its count to the add-on's configured count (min 1).
   const toggleAddon = (opt: PackageOption['addOns'][number], checked: boolean) => {
     setForm((f) => {
       if (checked) {
-        if (f.selectedAddons.some((a) => a.adons_id === opt.adonsId)) return f;
-        const next: SelectedAddon = {
-          adons_id: opt.adonsId,
-          adons_package_id: opt.adonsPackageId,
-          adons_name: opt.adonsName,
-          adons_count: opt.adonsCount ?? 1,
-          adons_price: opt.adonsPrice ?? 0,
-        };
+        if (f.selectedAddons.some((a) => a.id === opt.adonsId)) return f;
+        const next: SelectedAddon = { id: opt.adonsId, name: opt.adonsName, count: opt.adonsCount ?? 1, price: opt.adonsPrice ?? 0 };
         return { ...f, selectedAddons: [...f.selectedAddons, next] };
       }
-      return { ...f, selectedAddons: f.selectedAddons.filter((a) => a.adons_id !== opt.adonsId) };
+      return { ...f, selectedAddons: f.selectedAddons.filter((a) => a.id !== opt.adonsId) };
     });
   };
 
@@ -454,12 +434,14 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
     setSaving(true);
     try {
       const address = {
-        address_line1: form.addressLine1,
-        address_line2: form.addressLine2,
-        City: form.city,
-        State: form.state,
-        ZipCode: form.zipCode,
+        addressLine1: form.addressLine1,
+        addressLine2: form.addressLine2,
+        city: form.city,
+        state: form.state,
+        zipCode: form.zipCode,
       };
+      // The server prices add-ons from the catalogue; only the id and count are sent.
+      const addOns = form.selectedAddons.map((a) => ({ id: a.id, count: a.count }));
       const contact = {
         firstName: form.contactFirstName.trim(),
         lastName: form.contactLastName.trim(),
@@ -482,7 +464,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           businessContact: contact,
           accountStatus: form.accountStatus,
           packageId: form.packageId,
-          addOns: form.selectedAddons,
+          addOns,
           packageStartDate: localInputToIso(effectivePackageStart) ?? new Date().toISOString(),
           packageEndDate: localInputToIso(form.packageEndDate),
           freeTrialStartDate: localInputToIso(form.freeTrialStartDate),
@@ -504,7 +486,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           businessAddress: address,
           businessContact: contact,
           accountStatus: form.accountStatus,
-          addOns: form.selectedAddons,
+          addOns,
           packageStartDate: localInputToIso(effectivePackageStart),
           packageEndDate: localInputToIso(form.packageEndDate),
           freeTrialStartDate: localInputToIso(form.freeTrialStartDate),
@@ -722,7 +704,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                     <p className="muted">No add-ons available for this package.</p>
                   ) : (
                     selectedPackage.addOns.map((opt) => {
-                      const sel = form.selectedAddons.find((a) => a.adons_id === opt.adonsId);
+                      const sel = form.selectedAddons.find((a) => a.id === opt.adonsId);
                       return (
                         <div key={opt.adonsId} className="addon-row">
                           <label className="checkbox">
@@ -737,7 +719,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                             )}
                           </label>
                           {sel && (
-                            <span className="addon-count muted">Count: {sel.adons_count}</span>
+                            <span className="addon-count muted">Count: {sel.count}</span>
                           )}
                         </div>
                       );
@@ -752,8 +734,8 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                   ) : (
                     <ul className="addon-list">
                       {form.selectedAddons.map((a) => (
-                        <li key={a.adons_id}>
-                          {a.adons_name} × {a.adons_count} (${a.adons_price.toFixed(2)})
+                        <li key={a.id}>
+                          {a.name} × {a.count} (${a.price.toFixed(2)})
                         </li>
                       ))}
                     </ul>

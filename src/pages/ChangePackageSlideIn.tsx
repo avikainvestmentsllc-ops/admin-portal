@@ -11,13 +11,11 @@ interface Props {
 }
 
 export default function ChangePackageSlideIn({ accountId, current, options, onClose, onSaved }: Props) {
-  // Pre-select the package being edited by matching its name to a catalogue option.
+  // Pre-select the package being edited.
   const [packageId, setPackageId] = useState(
-    () => options.find((p) => p.packageName === current?.accountPackageName)?.packageId ?? '',
+    () => options.find((p) => p.packageId === current?.packageId)?.packageId ?? '',
   );
-  const [selectedAddons, setSelectedAddons] = useState<SelectedAddon[]>(
-    () => (Array.isArray(current?.addOns) ? (current!.addOns as SelectedAddon[]) : []),
-  );
+  const [selectedAddons, setSelectedAddons] = useState<SelectedAddon[]>(() => current?.addOns ?? []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -50,24 +48,15 @@ export default function ChangePackageSlideIn({ accountId, current, options, onCl
     return { oldEnd: fmt(oldEnd), newStart: fmt(boundary) };
   }, [current]);
 
-  const isSelected = (adonsId: string) => selectedAddons.some((a) => a.adons_id === adonsId);
+  const isSelected = (adonsId: string) => selectedAddons.some((a) => a.id === adonsId);
 
   const toggleAddon = (opt: PackageOption['addOns'][number], checked: boolean) => {
     setSelectedAddons((prev) => {
       if (checked) {
-        if (prev.some((a) => a.adons_id === opt.adonsId)) return prev;
-        return [
-          ...prev,
-          {
-            adons_id: opt.adonsId,
-            adons_package_id: opt.adonsPackageId,
-            adons_name: opt.adonsName,
-            adons_count: opt.adonsCount ?? 1,
-            adons_price: opt.adonsPrice ?? 0,
-          },
-        ];
+        if (prev.some((a) => a.id === opt.adonsId)) return prev;
+        return [...prev, { id: opt.adonsId, name: opt.adonsName, count: opt.adonsCount ?? 1, price: opt.adonsPrice ?? 0 }];
       }
-      return prev.filter((a) => a.adons_id !== opt.adonsId);
+      return prev.filter((a) => a.id !== opt.adonsId);
     });
   };
 
@@ -90,7 +79,8 @@ export default function ChangePackageSlideIn({ accountId, current, options, onCl
     setError(null);
     setSaving(true);
     try {
-      await changeLandlordPackage(accountId, { packageId, addOns: selectedAddons });
+      // The server prices add-ons from the catalogue; only the id and count are sent.
+      await changeLandlordPackage(accountId, { packageId, addOns: selectedAddons.map((a) => ({ id: a.id, count: a.count })) });
       onSaved();
     } catch (err) {
       setError(err instanceof ApiRequestError ? `${err.message} (${err.errorCode})` : 'Change failed');
@@ -140,7 +130,7 @@ export default function ChangePackageSlideIn({ accountId, current, options, onCl
                 <p className="muted">No add-ons available for this package.</p>
               ) : (
                 selectedPackage.addOns.map((opt) => {
-                  const sel = selectedAddons.find((a) => a.adons_id === opt.adonsId);
+                  const sel = selectedAddons.find((a) => a.id === opt.adonsId);
                   return (
                     <div key={opt.adonsId} className="addon-row">
                       <label className="checkbox">
@@ -154,7 +144,7 @@ export default function ChangePackageSlideIn({ accountId, current, options, onCl
                           <span className="muted"> — ${opt.adonsPrice.toFixed(2)}</span>
                         )}
                       </label>
-                      {sel && <span className="addon-count muted">Count: {sel.adons_count}</span>}
+                      {sel && <span className="addon-count muted">Count: {sel.count}</span>}
                     </div>
                   );
                 })

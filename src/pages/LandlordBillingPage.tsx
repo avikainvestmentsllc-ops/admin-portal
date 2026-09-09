@@ -23,16 +23,13 @@ function formatEin(ein: string): string {
   return d.length === 9 ? `${d.slice(0, 2)}-${d.slice(2)}` : ein || '—';
 }
 
-type AddOnLike = { adons_name?: string; adons_price?: number };
-
 function packageAddOnNames(p: LandlordPackageView): string {
-  return Array.isArray(p.addOns) && p.addOns.length > 0
-    ? (p.addOns as AddOnLike[]).map((a) => a.adons_name).filter(Boolean).join(', ')
-    : '—';
+  return p.addOns.length > 0 ? p.addOns.map((a) => a.name).filter(Boolean).join(', ') : '—';
 }
 
+/** Add-on prices are added once each (not multiplied by count), matching the server's billing math. */
 function packageAddOnTotal(p: LandlordPackageView): number {
-  return Array.isArray(p.addOns) ? (p.addOns as AddOnLike[]).reduce((sum, a) => sum + (a.adons_price ?? 0), 0) : 0;
+  return p.addOns.reduce((sum, a) => sum + (a.price ?? 0), 0);
 }
 
 type PlanStatus = 'Active' | 'Upcoming' | 'Expired' | '—';
@@ -133,7 +130,7 @@ export default function LandlordBillingPage() {
           {address && (
             <div className="detail-wide">
               <span className="detail-label">Business address</span>
-              {[address.address_line1, address.address_line2, address.City, address.State, address.ZipCode].filter(Boolean).join(', ') || '—'}
+              {account.formattedAddress || '—'}
             </div>
           )}
           {contact && (
@@ -159,7 +156,7 @@ export default function LandlordBillingPage() {
           {sortedPackages.length === 0 && <div className="table-empty">No package assigned.</div>}
           {sortedPackages.map((p) => {
             const status = planStatus(p);
-            const price = options.find((o) => o.packageName === p.accountPackageName);
+            const price = options.find((o) => o.packageId === p.packageId);
             void price;
             return (
               <div className="plan-row" key={p.accountPackageId ?? p.packageStartDate}>

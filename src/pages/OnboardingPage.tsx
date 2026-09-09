@@ -11,12 +11,9 @@ function formatEinDisplay(ein: string): string {
   return d.length === 9 ? `${d.slice(0, 2)}-${d.slice(2)}` : ein || '—';
 }
 
-/** Join the non-empty parts of a business address into a single display line. */
-function formatAddress(address: LandlordAccountView['businessAddress']): string {
-  if (!address) return '—';
-  return [address.address_line1, address.address_line2, address.City, address.State, address.ZipCode]
-    .filter(Boolean)
-    .join(', ') || '—';
+/** The server builds the single-line address (`formattedAddress`). */
+function formatAddress(account: LandlordAccountView): string {
+  return account.formattedAddress || '—';
 }
 
 function contactName(a: LandlordAccountView): string {
@@ -44,7 +41,7 @@ function OnboardingCard({ account, onView, onEdit }: { account: LandlordAccountV
           <div className="ob-card-row"><span className="ob-card-label">Email</span><span>{account.email || '—'}</span></div>
           <div className="ob-card-row"><span className="ob-card-label">Phone</span><span>{account.phoneNumber || '—'}</span></div>
           <div className="ob-card-row"><span className="ob-card-label">EIN</span><span>{formatEinDisplay(account.businessEin)}</span></div>
-          <div className="ob-card-row"><span className="ob-card-label">Address</span><span>{formatAddress(account.businessAddress)}</span></div>
+          <div className="ob-card-row"><span className="ob-card-label">Address</span><span>{formatAddress(account)}</span></div>
           <div className="ob-card-row"><span className="ob-card-label">Package</span><span>{account.packageName || '—'}</span></div>
           <div className="ob-card-row"><span className="ob-card-label">Contact</span><span>{contactName(account)}</span></div>
           <div className="ob-card-actions">

@@ -36,12 +36,14 @@ export interface MessageResponse {
 
 // ---------- Onboarding ----------
 
-export interface BusinessAddress {
-  address_line1: string;
-  address_line2?: string;
-  City: string;
-  State: string;
-  ZipCode: string;
+/** The one address wire shape shared by every client and both services. */
+export interface AddressDto {
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state: string;
+  zipCode: string;
+  country?: string | null;
 }
 
 export interface BusinessContact {
@@ -58,7 +60,9 @@ export interface LandlordAccountView {
   phoneNumber: string;
   businessName: string;
   businessEin: string;
-  businessAddress: BusinessAddress | null;
+  businessAddress: AddressDto | null;
+  /** Server-built single-line address. */
+  formattedAddress: string | null;
   businessContact: BusinessContact | null;
   accountStatus: boolean;
   packageName: string | null;
@@ -75,11 +79,26 @@ export interface LandlordAccountPage {
   totalPages: number;
 }
 
+/** An add-on on an account's package, as the server returns it (name and price resolved from the catalogue). */
+export interface SelectedAddon {
+  id: string;
+  name: string;
+  count: number;
+  price: number;
+}
+
+/** An add-on selection as sent to the server: the catalogue add-on and how many. */
+export interface AddonSelection {
+  id: string;
+  count: number;
+}
+
 export interface LandlordPackageView {
   accountPackageId: string;
   accountId: string;
+  packageId: string;
   accountPackageName: string;
-  addOns: unknown[];
+  addOns: SelectedAddon[];
   packageStartDate: string | null;
   packageEndDate: string | null;
   freeTrialStartDate: string | null;
@@ -106,6 +125,14 @@ export interface BillingView {
   subTotalAmount: number | null;
   taxAmount: number | null;
   totalAmount: number | null;
+  /** The package + add-ons snapshot the bill was generated from. */
+  packageDetails: PackageDetails | null;
+}
+
+export interface PackageDetails {
+  accountPackageId: string;
+  accountPackageName: string | null;
+  addOns: SelectedAddon[];
 }
 
 export interface LandlordBillingResponse {
@@ -115,7 +142,7 @@ export interface LandlordBillingResponse {
 
 export interface ChangePackageRequest {
   packageId: string;
-  addOns?: unknown[];
+  addOns?: AddonSelection[];
 }
 
 export interface AddonOption {
@@ -132,7 +159,7 @@ export interface PackageOption {
   addOns: AddonOption[];
 }
 
-// ---------- Package catalogue (landlord_package_lookup) ----------
+// ---------- Package catalogue (landlord_package) ----------
 
 export interface PackageView {
   packageId: string;
@@ -155,7 +182,7 @@ export interface PackageRequest {
   effectiveEndDateUtc?: string | null;
 }
 
-// ---------- Add-on catalogue (landlord_package_adons) ----------
+// ---------- Add-on catalogue (landlord_package_addon) ----------
 
 export interface AddonView {
   adonsId: string;
@@ -207,9 +234,10 @@ export interface ContractorView {
   isActive: boolean | null;
 }
 
-/** cities + radius only — zipcodes isn't collected here, matching contractor-ui's own self-edit form. */
+/** Cities, ZIP codes and radius. The admin form edits cities only; sending `zipcodes: null` leaves the stored ZIPs untouched. */
 export interface ContractorServiceArea {
   cities: string[] | null;
+  zipcodes?: string[] | null;
   radiusMiles: number | null;
 }
 
@@ -237,25 +265,16 @@ export interface ContractorUpdateRequest {
   isActive: boolean;
 }
 
-/** Shape persisted into landlord_account_package.add_ons (JSON array). */
-export interface SelectedAddon {
-  adons_id: string;
-  adons_package_id: string;
-  adons_name: string;
-  adons_count: number;
-  adons_price: number;
-}
-
 export interface OnboardLandlordRequest {
   email: string;
   phoneNumber: string;
   businessName: string;
   businessEin: string;
-  businessAddress: BusinessAddress;
+  businessAddress: AddressDto;
   businessContact: BusinessContact;
   accountStatus: boolean;
   packageId: string;
-  addOns?: unknown[];
+  addOns?: AddonSelection[];
   packageStartDate: string;
   packageEndDate?: string | null;
   freeTrialStartDate?: string | null;
@@ -269,10 +288,10 @@ export interface UpdateLandlordRequest {
   phoneNumber: string;
   businessName: string;
   businessEin: string;
-  businessAddress: BusinessAddress;
+  businessAddress: AddressDto;
   businessContact: BusinessContact;
   accountStatus: boolean;
-  addOns?: unknown[];
+  addOns?: AddonSelection[];
   packageStartDate?: string | null;
   packageEndDate?: string | null;
   freeTrialStartDate?: string | null;
