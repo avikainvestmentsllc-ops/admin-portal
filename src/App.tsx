@@ -13,6 +13,8 @@ import AddonsPage from './pages/AddonsPage';
 import LandlordBillingPage from './pages/LandlordBillingPage';
 import MileageRatesPage from './pages/MileageRatesPage';
 import ContractorsPage from './pages/ContractorsPage';
+import PlatformFeesPage from './pages/PlatformFeesPage';
+import ContractorFeesPage from './pages/ContractorFeesPage';
 
 export default function App() {
   return (
@@ -37,6 +39,8 @@ export default function App() {
             <Route path="/addons" element={<AddonsPage />} />
             <Route path="/mileage-rates" element={<MileageRatesPage />} />
             <Route path="/contractors" element={<ContractorsPage />} />
+            <Route path="/platform-fees" element={<PlatformFeesPage />} />
+            <Route path="/platform-fees/:contractorId" element={<ContractorFeesPage />} />
           </Route>
           {/* /dashboard is the default landing page after login */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

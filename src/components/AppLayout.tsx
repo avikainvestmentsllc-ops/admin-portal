@@ -11,6 +11,7 @@ const NAV_ITEMS: { label: string; short: string; to: string; icon: IconName }[] 
   { label: 'Add-ons', short: 'Add-ons', to: '/addons', icon: 'addons' },
   { label: 'Mileage Rates', short: 'Mileage', to: '/mileage-rates', icon: 'mileage' },
   { label: 'Contractors', short: 'Contractors', to: '/contractors', icon: 'contractors' },
+  { label: 'Platform Fees', short: 'Fees', to: '/platform-fees', icon: 'fees' },
 ];
 
 function initials(first?: string, last?: string): string {

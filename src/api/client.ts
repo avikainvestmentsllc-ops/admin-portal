@@ -21,6 +21,11 @@ import type {
   ResetTokenInfo,
   UpdateLandlordRequest,
   DashboardSummary,
+  ContractorFeeOverview,
+  ContractorFeeDetail,
+  FeePolicyRequest,
+  PlatformInvoiceRow,
+  IssueResult,
 } from './types';
 
 // Backend origin. Empty in dev so the Vite proxy handles /managehouselease/*; set to the
@@ -34,6 +39,7 @@ const PACKAGES = `${API_BASE}/managehouselease/packages`;
 const ADDONS = `${API_BASE}/managehouselease/addons`;
 const MILEAGE_RATES = `${API_BASE}/managehouselease/mileage-rates`;
 const CONTRACTORS = `${API_BASE}/managehouselease/contractors`;
+const PLATFORM_FEES = `${API_BASE}/managehouselease/platform-fees`;
 
 export class ApiRequestError extends Error {
   errorCode: string;
@@ -292,4 +298,40 @@ export function updateContractor(contractorId: string, body: ContractorUpdateReq
     method: 'PUT',
     body: JSON.stringify(body),
   });
+}
+
+// ---------- Platform fees ----------
+
+/** Every contractor with the rule they are on and what they owe. */
+export function listContractorFees(): Promise<ContractorFeeOverview[]> {
+  return authJson<ContractorFeeOverview[]>(`${PLATFORM_FEES}/contractors`);
+}
+
+export function getContractorFees(contractorId: string): Promise<ContractorFeeDetail> {
+  return authJson<ContractorFeeDetail>(`${PLATFORM_FEES}/contractors/${contractorId}`);
+}
+
+/** A new rule version, effective now — jobs already priced keep the rule they were priced under. */
+export function setContractorFeeRule(contractorId: string, body: FeePolicyRequest): Promise<ContractorFeeDetail> {
+  return authJson<ContractorFeeDetail>(`${PLATFORM_FEES}/contractors/${contractorId}/rule`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export function markPlatformInvoicePaid(invoiceId: string, note: string | null): Promise<PlatformInvoiceRow> {
+  return authJson<PlatformInvoiceRow>(`${PLATFORM_FEES}/invoices/${invoiceId}/paid`, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+}
+
+export async function waivePlatformFee(feeId: string): Promise<void> {
+  const res = await authFetch(`${PLATFORM_FEES}/fees/${feeId}/waive`, { method: 'POST' });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+}
+
+/** Issues statements for a month (yyyy-MM) now instead of waiting for the first. */
+export function issuePlatformInvoices(period: string): Promise<IssueResult> {
+  return authJson<IssueResult>(`${PLATFORM_FEES}/invoices/issue?period=${encodeURIComponent(period)}`, { method: 'POST' });
 }

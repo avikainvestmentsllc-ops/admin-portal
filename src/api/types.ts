@@ -326,3 +326,97 @@ export interface DashboardSummary {
   packageMix: DashboardPackageMix[];
   attention: DashboardAttentionItem[];
 }
+
+// ---------- Platform fees (contractor_fee_policy / platform_fee / platform_invoice) ----------
+
+/** The rule a contractor is charged under; `platformDefault` when they have none of their own. */
+export interface FeeRule {
+  policyId: string | null;
+  version: number | null;
+  baseFee: number;
+  pctThreshold: number;
+  pctRate: number;
+  maxFee: number | null;
+  effectiveFrom: string | null;
+  note: string | null;
+  createdBy: string | null;
+  platformDefault: boolean;
+}
+
+export interface ContractorFeeOverview {
+  contractorId: string;
+  companyName: string | null;
+  contactName: string | null;
+  email: string | null;
+  isActive: boolean | null;
+  rule: FeeRule;
+  jobsThisMonth: number;
+  accruedThisMonth: number;
+  unbilledJobs: number;
+  unbilled: number;
+  openInvoices: number;
+  outstanding: number;
+  lifetime: number;
+}
+
+export interface PlatformFeeRow {
+  feeId: string;
+  maintenanceId: string;
+  title: string;
+  jobAmount: number;
+  baseFee: number;
+  pctFee: number;
+  totalFee: number;
+  capped: boolean;
+  assessedAt: string;
+  status: 'ACCRUED' | 'INVOICED' | 'WAIVED';
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  ruleVersion: number | null;
+}
+
+export interface PlatformInvoiceRow {
+  invoiceId: string;
+  invoiceNumber: string;
+  periodStart: string;
+  periodEnd: string;
+  jobCount: number;
+  totalAmount: number;
+  status: 'ISSUED' | 'PAID' | 'VOID';
+  issuedAt: string;
+  dueDate: string;
+  paidAt: string | null;
+  paidNote: string | null;
+}
+
+export interface ContractorFeeDetail {
+  contractorId: string;
+  companyName: string | null;
+  email: string | null;
+  rule: FeeRule;
+  history: FeeRule[];
+  jobsThisMonth: number;
+  accruedThisMonth: number;
+  unbilledJobs: number;
+  unbilled: number;
+  openInvoices: number;
+  outstanding: number;
+  lifetime: number;
+  fees: PlatformFeeRow[];
+  invoices: PlatformInvoiceRow[];
+}
+
+export interface FeePolicyRequest {
+  baseFee: number;
+  pctThreshold: number;
+  pctRate: number;
+  maxFee: number | null;
+  note: string | null;
+}
+
+export interface IssueResult {
+  period: string;
+  statementsIssued: number;
+  feesBilled: number;
+  totalBilled: number;
+}
