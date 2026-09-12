@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { getContractor, updateContractor } from '../api/client';
+import { getContractor, listContractorServiceOptions, updateContractor } from '../api/client';
 import { toUserMessage } from '../api/errorMessages';
-import type { ContractorDetailView, ContractorUpdateRequest, ContractorView } from '../api/types';
+import type { ContractorDetailView, ContractorServiceOption, ContractorUpdateRequest, ContractorView } from '../api/types';
 
 interface Props {
   contractor: ContractorView;
@@ -9,17 +9,17 @@ interface Props {
   onSaved: () => void;
 }
 
-// Matches contractor-ui's own self-edit form (contractor-ui/src/pages/Profile.jsx) exactly, so
-// an admin edits the same vocabulary a contractor would see/set themselves.
-const SPECIALTIES = [
-  'HVAC', 'Plumbing', 'Electrical', 'Roofing', 'Painting',
-  'Cleaning', 'Appliance Repair', 'Handyman', 'Other',
-];
+// The selectable services come from the server (GET /contractors/services), which serves
+// rental-service's contractor_service catalogue — and since V10 that catalogue IS the maintenance
+// category list, because a request is matched to a contractor by exact category==service name.
+// Hardcoding the nine old trade names here meant an admin could set "Plumbing" on a firm that
+// would then never match a "Plumbing Repairs" request.
 
 export default function ContractorSlideIn({ contractor, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [detail, setDetail] = useState<ContractorDetailView | null>(null);
+  const [serviceOptions, setServiceOptions] = useState<ContractorServiceOption[]>([]);
 
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [cities, setCities] = useState('');
@@ -55,10 +55,30 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
     return () => { cancelled = true; };
   }, [contractor.contractorId]);
 
+  // The catalogue is account-independent, so it is fetched once alongside the contractor. A
+  // failure leaves the list empty rather than blocking the rest of the panel; whatever the
+  // contractor already has stays selected and saveable.
+  useEffect(() => {
+    let cancelled = false;
+    listContractorServiceOptions()
+      .then((options) => { if (!cancelled) setServiceOptions(options); })
+      .catch(() => { if (!cancelled) setServiceOptions([]); });
+    return () => { cancelled = true; };
+  }, []);
+
   function toggleSpecialty(name: string) {
     setSpecialties((prev) => prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]);
     setSavedMessage(null);
   }
+
+  // What the checkbox list offers: the server catalogue, plus any name this contractor already
+  // carries that is no longer in it (a pre-V10 trade name, or a service since deactivated), so
+  // editing another field never silently drops a selection the admin can still see and untick.
+  const selectableServices = useMemo(() => {
+    const names = serviceOptions.map((o) => o.name);
+    const extras = specialties.filter((s) => !names.includes(s));
+    return [...names, ...extras];
+  }, [serviceOptions, specialties]);
 
   const fieldErrors = useMemo(() => ({
     specialties: specialties.length === 0 ? 'Select at least one specialty' : '',
@@ -137,7 +157,7 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
 
             <fieldset>
               <legend>Specialties</legend>
-              {SPECIALTIES.map((name) => (
+              {selectableServices.map((name) => (
                 <label key={name} className="checkbox">
                   <input
                     type="checkbox"

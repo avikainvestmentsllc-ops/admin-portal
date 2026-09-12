@@ -5,8 +5,14 @@ import type {
   ApiError,
   ChangePackageRequest,
   ContractorDetailView,
+  ContractorFeeDetail,
+  ContractorFeeOverview,
+  ContractorServiceOption,
   ContractorUpdateRequest,
   ContractorView,
+  DashboardSummary,
+  FeePolicyRequest,
+  IssueResult,
   LandlordAccountPage,
   LandlordBillingResponse,
   LandlordDetailsResponse,
@@ -18,14 +24,9 @@ import type {
   PackageOption,
   PackageRequest,
   PackageView,
+  PlatformInvoiceRow,
   ResetTokenInfo,
   UpdateLandlordRequest,
-  DashboardSummary,
-  ContractorFeeOverview,
-  ContractorFeeDetail,
-  FeePolicyRequest,
-  PlatformInvoiceRow,
-  IssueResult,
 } from './types';
 
 // Backend origin. Empty in dev so the Vite proxy handles /managehouselease/*; set to the
@@ -291,6 +292,11 @@ export function listAllContractors(): Promise<ContractorView[]> {
 
 export function getContractor(contractorId: string): Promise<ContractorDetailView> {
   return authJson<ContractorDetailView>(`${CONTRACTORS}/${contractorId}`);
+}
+
+/** The selectable Business Services, which are rental-service's maintenance categories. */
+export function listContractorServiceOptions(): Promise<ContractorServiceOption[]> {
+  return authJson<ContractorServiceOption[]>(`${CONTRACTORS}/services`);
 }
 
 export function updateContractor(contractorId: string, body: ContractorUpdateRequest): Promise<ContractorDetailView> {

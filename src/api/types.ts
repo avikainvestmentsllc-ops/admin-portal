@@ -420,3 +420,9 @@ export interface IssueResult {
   feesBilled: number;
   totalBilled: number;
 }
+
+/** One selectable Business Service (GET /contractors/services) — named after a maintenance category. */
+export interface ContractorServiceOption {
+  id: string;
+  name: string;
+}
