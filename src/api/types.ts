@@ -234,34 +234,63 @@ export interface ContractorView {
   isActive: boolean | null;
 }
 
-/** Cities, ZIP codes and radius. The admin form edits cities only; sending `zipcodes: null` leaves the stored ZIPs untouched. */
+/** Cities, ZIP codes and radius, as the admin service stores them. */
 export interface ContractorServiceArea {
   cities: string[] | null;
-  zipcodes?: string[] | null;
+  zipcodes: string[] | null;
   radiusMiles: number | null;
 }
 
+/**
+ * Full row on the Admin > Contractors edit panel — the admin service's `ContractorDetailView`.
+ * `services` are the contractor's Business Services (rental-service's maintenance categories),
+ * as id+name pairs so the checklist can pre-select by id.
+ */
 export interface ContractorDetailView {
   contractorId: string;
   companyName: string | null;
-  contactFirstName: string | null;
-  contactLastName: string | null;
+  businessEin: string | null;
   phoneNumber: string | null;
+  businessPhoneExtension: string | null;
+  businessWebsite: string | null;
+  contactFirstName: string | null;
+  contactMiddleName: string | null;
+  contactLastName: string | null;
   email: string | null;
-  specialties: string[];
+  services: ContractorServiceOption[];
   serviceArea: ContractorServiceArea | null;
   licenseNumber: string | null;
+  licenseIssueState: string | null;
+  licenseExpiryDate: string | null;
   insuranceProvider: string | null;
   insurancePolicyNumber: string | null;
+  insuranceExpiryDate: string | null;
   isActive: boolean | null;
+  /** ISO instant of the administrator's approval; null until the business has been activated. */
+  activatedAt: string | null;
 }
 
+/**
+ * PUT /contractors/{id} — the admin service's `ContractorUpdateRequest`. Company name, phone and
+ * at least one service are required there; the email is not editable (it is the login).
+ */
 export interface ContractorUpdateRequest {
-  specialties: string[];
+  companyName: string;
+  businessEin: string | null;
+  phoneNumber: string;
+  businessPhoneExtension: string | null;
+  businessWebsite: string | null;
+  contactFirstName: string | null;
+  contactMiddleName: string | null;
+  contactLastName: string | null;
+  serviceIds: string[];
   serviceArea: ContractorServiceArea | null;
   licenseNumber: string | null;
+  licenseIssueState: string | null;
+  licenseExpiryDate: string | null;
   insuranceProvider: string | null;
   insurancePolicyNumber: string | null;
+  insuranceExpiryDate: string | null;
   isActive: boolean;
 }
 
