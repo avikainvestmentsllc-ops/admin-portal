@@ -11,8 +11,6 @@ import type {
   ContractorUpdateRequest,
   ContractorView,
   DashboardSummary,
-  FeePolicyRequest,
-  IssueResult,
   LandlordAccountPage,
   LandlordBillingResponse,
   LandlordDetailsResponse,
@@ -24,9 +22,15 @@ import type {
   PackageOption,
   PackageRequest,
   PackageView,
-  PlatformInvoiceRow,
   ResetTokenInfo,
   UpdateLandlordRequest,
+  PricingSheetRequest,
+  ReconcileRequested,
+  PlatformStatementRow,
+  PlatformStatementDetail,
+  StatementRun,
+  PricingTermsVersion,
+  CategoryOption,
 } from './types';
 
 // Backend origin. Empty in dev so the Vite proxy handles /managehouselease/*; set to the
@@ -41,6 +45,7 @@ const ADDONS = `${API_BASE}/managehouselease/addons`;
 const MILEAGE_RATES = `${API_BASE}/managehouselease/mileage-rates`;
 const CONTRACTORS = `${API_BASE}/managehouselease/contractors`;
 const PLATFORM_FEES = `${API_BASE}/managehouselease/platform-fees`;
+const PRICING_TERMS = `${API_BASE}/managehouselease/pricing-terms`;
 
 export class ApiRequestError extends Error {
   errorCode: string;
@@ -308,7 +313,6 @@ export function updateContractor(contractorId: string, body: ContractorUpdateReq
 
 // ---------- Platform fees ----------
 
-/** Every contractor with the rule they are on and what they owe. */
 export function listContractorFees(): Promise<ContractorFeeOverview[]> {
   return authJson<ContractorFeeOverview[]>(`${PLATFORM_FEES}/contractors`);
 }
@@ -317,19 +321,47 @@ export function getContractorFees(contractorId: string): Promise<ContractorFeeDe
   return authJson<ContractorFeeDetail>(`${PLATFORM_FEES}/contractors/${contractorId}`);
 }
 
-/** A new rule version, effective now — jobs already priced keep the rule they were priced under. */
-export function setContractorFeeRule(contractorId: string, body: FeePolicyRequest): Promise<ContractorFeeDetail> {
-  return authJson<ContractorFeeDetail>(`${PLATFORM_FEES}/contractors/${contractorId}/rule`, {
+/** A new override sheet, effective now — jobs already priced keep the sheet they were priced under. */
+export function setContractorPricing(contractorId: string, body: PricingSheetRequest): Promise<ContractorFeeDetail> {
+  return authJson<ContractorFeeDetail>(`${PLATFORM_FEES}/contractors/${contractorId}/pricing`, {
     method: 'PUT',
     body: JSON.stringify(body),
   });
 }
 
-export function markPlatformInvoicePaid(invoiceId: string, note: string | null): Promise<PlatformInvoiceRow> {
-  return authJson<PlatformInvoiceRow>(`${PLATFORM_FEES}/invoices/${invoiceId}/paid`, {
+/** Queues the idempotent statement run for a period (yyyy-MM of the run month). Poll the run for the outcome. */
+export function reconcileStatements(period: string): Promise<ReconcileRequested> {
+  return authJson<ReconcileRequested>(`${PLATFORM_FEES}/statements/reconcile?period=${encodeURIComponent(period)}`, { method: 'POST' });
+}
+
+export function listStatements(period: string): Promise<PlatformStatementRow[]> {
+  return authJson<PlatformStatementRow[]>(`${PLATFORM_FEES}/statements?period=${encodeURIComponent(period)}`);
+}
+
+export function getStatement(invoiceId: string): Promise<PlatformStatementDetail> {
+  return authJson<PlatformStatementDetail>(`${PLATFORM_FEES}/statements/${invoiceId}`);
+}
+
+export function markStatementPaid(invoiceId: string, note: string | null): Promise<PlatformStatementRow> {
+  return authJson<PlatformStatementRow>(`${PLATFORM_FEES}/statements/${invoiceId}/paid`, {
     method: 'POST',
     body: JSON.stringify({ note }),
   });
+}
+
+export function voidStatement(invoiceId: string, note: string): Promise<PlatformStatementRow> {
+  return authJson<PlatformStatementRow>(`${PLATFORM_FEES}/statements/${invoiceId}/void`, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function listStatementRuns(): Promise<StatementRun[]> {
+  return authJson<StatementRun[]>(`${PLATFORM_FEES}/runs`);
+}
+
+export function getStatementRun(runId: string): Promise<StatementRun> {
+  return authJson<StatementRun>(`${PLATFORM_FEES}/runs/${runId}`);
 }
 
 export async function waivePlatformFee(feeId: string): Promise<void> {
@@ -337,7 +369,42 @@ export async function waivePlatformFee(feeId: string): Promise<void> {
   if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
 }
 
-/** Issues statements for a month (yyyy-MM) now instead of waiting for the first. */
-export function issuePlatformInvoices(period: string): Promise<IssueResult> {
-  return authJson<IssueResult>(`${PLATFORM_FEES}/invoices/issue?period=${encodeURIComponent(period)}`, { method: 'POST' });
+// ---------- Pricing terms (master pricing sheet + T&C PDF) ----------
+
+export function listPricingTerms(): Promise<PricingTermsVersion[]> {
+  return authJson<PricingTermsVersion[]>(PRICING_TERMS);
+}
+
+export function listPricingCategories(): Promise<CategoryOption[]> {
+  return authJson<CategoryOption[]>(`${PRICING_TERMS}/categories`);
+}
+
+/** Multipart: the sheet as a JSON part plus the PDF. Goes through authFetch because authJson forces a JSON content type. */
+async function sendPricingTerms(url: string, method: 'POST' | 'PUT', sheet: PricingSheetRequest, file: File | null): Promise<PricingTermsVersion> {
+  const form = new FormData();
+  form.append('sheet', new Blob([JSON.stringify(sheet)], { type: 'application/json' }));
+  if (file) form.append('file', file, file.name);
+  const res = await authFetch(url, { method, body: form });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return res.json() as Promise<PricingTermsVersion>;
+}
+
+export function createPricingTerms(sheet: PricingSheetRequest, file: File): Promise<PricingTermsVersion> {
+  return sendPricingTerms(PRICING_TERMS, 'POST', sheet, file);
+}
+
+export function updatePricingTerms(sheetId: string, sheet: PricingSheetRequest, file: File | null): Promise<PricingTermsVersion> {
+  return sendPricingTerms(`${PRICING_TERMS}/${sheetId}`, 'PUT', sheet, file);
+}
+
+export async function deletePricingTerms(sheetId: string): Promise<void> {
+  const res = await authFetch(`${PRICING_TERMS}/${sheetId}`, { method: 'DELETE' });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+}
+
+/** The T&C PDF as a blob URL (the endpoint needs the bearer, so it cannot be an <iframe src> directly). Revoke it when done. */
+export async function pricingTermsFileUrl(sheetId: string): Promise<string> {
+  const res = await authFetch(`${PRICING_TERMS}/${sheetId}/file`);
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return URL.createObjectURL(await res.blob());
 }

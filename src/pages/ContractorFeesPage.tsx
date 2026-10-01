@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ApiRequestError, getContractorFees, markPlatformInvoicePaid, waivePlatformFee } from '../api/client';
+import { ApiRequestError, getContractorFees, pricingTermsFileUrl, waivePlatformFee } from '../api/client';
 import { toUserMessage } from '../api/errorMessages';
 import type { ContractorFeeDetail, PlatformFeeRow, PlatformInvoiceRow } from '../api/types';
 import { money } from '../components/AppLayout';
 import { usePageHeader, useToast } from '../components/AppShell';
-import FeeRuleSlideIn from './FeeRuleSlideIn';
-import { ruleLine } from './PlatformFeesPage';
+import PdfPreview from '../components/PdfPreview';
+import { DEFAULT_ROW_LABEL, periodLabel, periodOf, sortRows, sourceLabel, sourcePill } from '../utils/pricing';
+import PricingSheetSlideIn, { day } from './PricingSheetSlideIn';
+import StatementSlideIn from './StatementSlideIn';
+
+export { day };
 
 /** Fees are grouped into calendar months in the ledger's zone, the same one the server bills in. */
 const ZONE = 'America/New_York';
@@ -24,12 +28,6 @@ function monthLabel(key: string): string {
   return new Date(y, (m || 1) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-export function day(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 const FEE_PILL: Record<string, string> = { ACCRUED: 'pill pending', INVOICED: 'pill info', WAIVED: 'pill off' };
 
 interface MonthGroup {
@@ -42,7 +40,7 @@ interface MonthGroup {
   total: number;
   unbilled: number;
   waived: number;
-  /** Statements whose period is this month, newest first. */
+  /** Statements whose period ends in this month (the 20th–19th period is named for the month it ends in). */
   invoices: PlatformInvoiceRow[];
 }
 
@@ -67,29 +65,25 @@ function groupByMonth(detail: ContractorFeeDetail): MonthGroup[] {
     g.total += Number(f.totalFee);
     if (f.status === 'ACCRUED') g.unbilled += Number(f.totalFee);
   }
-  for (const i of detail.invoices) at(i.periodStart.slice(0, 7)).invoices.push(i);
+  for (const i of detail.invoices) at(periodOf(i.periodEnd)).invoices.push(i);
   return [...groups.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
 }
 
-function statementCell(g: MonthGroup, busy: string | null, onPaid: (i: PlatformInvoiceRow) => void) {
+function statementCell(g: MonthGroup, onOpen: (i: PlatformInvoiceRow) => void) {
   if (g.invoices.length === 0) {
     return g.unbilled > 0
       ? <span className="muted">Not issued yet</span>
-      : g.jobs > 0 ? <span className="muted">On a later statement</span> : <span className="muted">—</span>;
+      : g.jobs > 0 ? <span className="muted">On another statement</span> : <span className="muted">—</span>;
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {g.invoices.map((i) => (
         <div key={i.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span className="cell-mono">{i.invoiceNumber}</span>
+          <button type="button" className="ghost sm" onClick={(e) => { e.stopPropagation(); onOpen(i); }}>{i.invoiceNumber}</button>
+          <span className="muted">{periodLabel(i.periodStart, i.periodEnd)}</span>
           <span className={i.status === 'PAID' ? 'pill on' : i.status === 'ISSUED' ? 'pill pending' : 'pill off'}>
             {i.status === 'ISSUED' ? `Due ${day(i.dueDate)}` : i.status === 'PAID' ? `Paid ${day(i.paidAt)}` : 'Void'}
           </span>
-          {i.status === 'ISSUED' && (
-            <button type="button" className="ghost sm" disabled={busy === i.invoiceId} onClick={(e) => { e.stopPropagation(); onPaid(i); }}>
-              {busy === i.invoiceId ? 'Saving…' : 'Mark paid'}
-            </button>
-          )}
         </div>
       ))}
     </div>
@@ -98,7 +92,7 @@ function statementCell(g: MonthGroup, busy: string | null, onPaid: (i: PlatformI
 
 /**
  * One contractor's platform fees, month by month: what was invoiced, what the platform charged
- * on it, and the statement each month went out on. A month opens to show every job under it.
+ * on it, and the statement each fee went out on. A month opens to show every job under it.
  */
 export default function ContractorFeesPage() {
   const { contractorId } = useParams<{ contractorId: string }>();
@@ -109,7 +103,9 @@ export default function ContractorFeesPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
-  const [editingRule, setEditingRule] = useState(false);
+  const [editingPricing, setEditingPricing] = useState(false);
+  const [openStatement, setOpenStatement] = useState<string | null>(null);
+  const [showTerms, setShowTerms] = useState(false);
 
   const name = detail?.companyName || 'Contractor';
   usePageHeader({
@@ -117,7 +113,7 @@ export default function ContractorFeesPage() {
     subtitle: detail ? `${name}${detail.email ? ` · ${detail.email}` : ''}` : 'Fees by month for this contractor',
     backLabel: 'Back to Platform Fees',
     onBack: () => navigate('/platform-fees'),
-    cta: detail ? { label: 'Adjust fee rule', onClick: () => setEditingRule(true) } : undefined,
+    cta: detail ? { label: 'Override pricing', onClick: () => setEditingPricing(true) } : undefined,
   });
 
   const load = useCallback(async () => {
@@ -127,7 +123,6 @@ export default function ContractorFeesPage() {
     try {
       const d = await getContractorFees(contractorId);
       setDetail(d);
-      // The newest month opens by itself; the rest stay folded.
       setOpenMonths((prev) => {
         if (prev.size > 0) return prev;
         const first = d.fees[0] ? monthKey(d.fees[0].assessedAt) : null;
@@ -143,6 +138,8 @@ export default function ContractorFeesPage() {
   useEffect(() => { void load(); }, [load]);
 
   const months = useMemo(() => (detail ? groupByMonth(detail) : []), [detail]);
+  const termsSheetId = detail?.termsAccepted?.sheetId ?? null;
+  const loadTerms = useCallback(() => pricingTermsFileUrl(termsSheetId as string), [termsSheetId]);
 
   function toggle(key: string) {
     setOpenMonths((prev) => {
@@ -150,21 +147,6 @@ export default function ContractorFeesPage() {
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
-  }
-
-  async function markPaid(i: PlatformInvoiceRow) {
-    const ref = window.prompt(`Mark ${i.invoiceNumber} (${money(i.totalAmount)}) paid. Payment reference (optional):`, '');
-    if (ref === null) return;
-    setBusy(i.invoiceId);
-    try {
-      await markPlatformInvoicePaid(i.invoiceId, ref.trim() || null);
-      toast(`${i.invoiceNumber} marked paid.`);
-      await load();
-    } catch (e) {
-      setError(toUserMessage(e));
-    } finally {
-      setBusy(null);
-    }
   }
 
   async function waive(f: PlatformFeeRow) {
@@ -196,29 +178,46 @@ export default function ContractorFeesPage() {
             <div className="tile"><div><div className="tile-value">{money(detail.lifetime)}</div><div className="tile-label">Lifetime fees</div></div></div>
           </div>
 
-          <div className="detail-card">
+          <div className="detail-card" data-testid="contractor-pricing-card">
             <div className="detail-head">
               <div style={{ minWidth: 0 }}>
-                <h3>Fee rule</h3>
-                <div className="detail-cid">{ruleLine(detail.rule)}</div>
+                <h3>Pricing</h3>
+                <div className="detail-cid">
+                  {sourceLabel(detail.pricing.source)}
+                  {detail.pricing.version != null ? ` · v${detail.pricing.version}` : ''}
+                  {detail.pricing.effectiveFrom ? ` · since ${day(detail.pricing.effectiveFrom)}` : ''}
+                  {detail.pricing.createdBy ? ` · set by ${detail.pricing.createdBy}` : ''}
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <span className={detail.rule.platformDefault ? 'pill off' : 'pill info'}>
-                  {detail.rule.platformDefault ? 'Platform default' : `Version ${detail.rule.version}`}
-                </span>
-                <button className="ghost primary" onClick={() => setEditingRule(true)}>Adjust fee rule</button>
+                <span className={sourcePill(detail.pricing.source)}>{sourceLabel(detail.pricing.source)}</span>
+                <button className="ghost primary" onClick={() => setEditingPricing(true)}>Override pricing</button>
               </div>
             </div>
-            <div className="detail-grid">
-              <div><span className="detail-label">Base fee, every job</span>{money(detail.rule.baseFee)}</div>
-              <div><span className="detail-label">Percentage</span>{Number(detail.rule.pctRate) > 0 ? `${Number(detail.rule.pctRate)}% of the part above ${money(detail.rule.pctThreshold)}` : 'None'}</div>
-              <div><span className="detail-label">Maximum per job</span>{detail.rule.maxFee != null && Number(detail.rule.maxFee) > 0 ? money(detail.rule.maxFee) : 'No maximum'}</div>
-              <div><span className="detail-label">In force since</span>{detail.rule.platformDefault ? 'Always (no rule of their own)' : day(detail.rule.effectiveFrom)}</div>
-              <div><span className="detail-label">Set by</span>{detail.rule.createdBy || (detail.rule.platformDefault ? 'Platform configuration' : '—')}</div>
-              <div><span className="detail-label">Versions</span>{detail.history.length === 0 ? 'None yet' : `${detail.history.length} · earlier jobs keep the version they were priced under`}</div>
-              {detail.rule.note && (
-                <div className="detail-wide"><span className="detail-label">Note</span>{detail.rule.note}</div>
-              )}
+            <div style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 12 }}>
+              <table className="data-table" data-testid="contractor-pricing-rows">
+                <thead><tr><th>Category</th><th>Base</th><th>Percentage</th><th>Max per job</th></tr></thead>
+                <tbody>
+                  {sortRows(detail.pricing.rows).map((r) => (
+                    <tr key={r.rowId ?? r.categoryId ?? 'default'}>
+                      <td className={r.isDefault ? 'cell-strong' : undefined}>{r.isDefault ? DEFAULT_ROW_LABEL : r.categoryName ?? 'Category'}</td>
+                      <td className="cell-mono">{money(r.baseFee)}</td>
+                      <td className="cell-mono">{Number(r.pctRate) > 0 ? `${Number(r.pctRate)}% above ${money(r.pctThreshold)}` : 'None'}</td>
+                      <td className="cell-mono">{r.maxFee != null && Number(r.maxFee) > 0 ? money(r.maxFee) : 'No maximum'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="detail-grid" style={{ marginTop: 14 }}>
+              <div>
+                <span className="detail-label">Terms accepted</span>
+                {detail.termsAccepted
+                  ? <>v{detail.termsAccepted.version ?? '?'} on {day(detail.termsAccepted.acceptedAt)} <button type="button" className="ghost sm" style={{ marginLeft: 8 }} onClick={() => setShowTerms(true)}>View PDF</button></>
+                  : <span className="muted">None on file — registered before pricing terms existed</span>}
+              </div>
+              <div><span className="detail-label">Overrides</span>{detail.overrideHistory.length === 0 ? 'None — priced from the template' : `${detail.overrideHistory.length} version${detail.overrideHistory.length === 1 ? '' : 's'} · earlier jobs keep the sheet they were priced under`}</div>
+              {detail.pricing.note && <div><span className="detail-label">Note</span>{detail.pricing.note}</div>}
             </div>
           </div>
 
@@ -249,13 +248,16 @@ export default function ContractorFeesPage() {
                       <td className="cell-mono">{money(g.base)}</td>
                       <td className="cell-mono">{money(g.pct)}</td>
                       <td className="cell-mono cell-strong">{money(g.total)}{g.unbilled > 0 && g.unbilled !== g.total && <span className="muted"> · {money(g.unbilled)} unbilled</span>}</td>
-                      <td onClick={(e) => e.stopPropagation()}>{statementCell(g, busy, (i) => void markPaid(i))}</td>
+                      <td onClick={(e) => e.stopPropagation()}>{statementCell(g, (i) => setOpenStatement(i.invoiceId))}</td>
                     </tr>,
                     ...(isOpen ? g.fees.map((f) => (
                       <tr key={f.feeId} style={{ background: 'var(--row)' }}>
                         <td colSpan={2} style={{ paddingLeft: 32 }}>
                           <div className="cell-strong">{f.title}</div>
-                          <div className="muted">{day(f.assessedAt)}{f.ruleVersion != null ? ` · rule v${f.ruleVersion}` : ' · platform default'}{f.capped ? ' · capped' : ''}</div>
+                          <div className="muted">
+                            {day(f.assessedAt)} · {f.categoryName ?? 'No category'}
+                            {f.sheetVersion != null ? ` · ${sourceLabel(f.pricingSource)} v${f.sheetVersion}` : ' · platform default'}{f.capped ? ' · capped' : ''}
+                          </div>
                         </td>
                         <td className="cell-mono">{money(f.jobAmount)}</td>
                         <td className="cell-mono">{money(f.baseFee)}</td>
@@ -277,14 +279,23 @@ export default function ContractorFeesPage() {
         </>
       )}
 
-      {editingRule && detail && (
-        <FeeRuleSlideIn
+      {editingPricing && detail && (
+        <PricingSheetSlideIn
+          mode="override"
           contractorId={detail.contractorId}
           name={name}
           detail={detail}
-          onClose={() => setEditingRule(false)}
-          onSaved={(d) => { setDetail(d); toast(`Rule v${d.rule.version} applies to jobs invoiced from now on.`); }}
+          onClose={() => setEditingPricing(false)}
+          onSaved={(d) => { setDetail(d); toast(`Override v${d.pricing.version} applies to jobs invoiced from now on.`); }}
         />
+      )}
+
+      {openStatement && (
+        <StatementSlideIn invoiceId={openStatement} onClose={() => setOpenStatement(null)} onChanged={() => void load()} />
+      )}
+
+      {showTerms && termsSheetId && (
+        <PdfPreview title={`Pricing terms accepted by ${name}`} load={loadTerms} onClose={() => setShowTerms(false)} />
       )}
     </div>
   );

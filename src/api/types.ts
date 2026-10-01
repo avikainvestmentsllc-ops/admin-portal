@@ -356,11 +356,76 @@ export interface DashboardSummary {
   attention: DashboardAttentionItem[];
 }
 
-// ---------- Platform fees (contractor_fee_policy / platform_fee / platform_invoice) ----------
+// ---------- Platform fees (contractor_pricing_sheet / platform_fee / platform_invoice) ----------
 
-/** The rule a contractor is charged under; `platformDefault` when they have none of their own. */
+/** One line of a pricing sheet; `isDefault` marks the "all other categories" row. */
+export interface PricingRow {
+  rowId?: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  baseFee: number;
+  pctThreshold: number;
+  pctRate: number;
+  maxFee: number | null;
+  isDefault: boolean;
+}
+
+export type PricingSource = 'OVERRIDE' | 'ACCEPTED_TEMPLATE' | 'CURRENT_TEMPLATE' | 'DEFAULT';
+
+/** A pricing sheet as it applies to a contractor. `sheetId` is null when the platform's configured default applies. */
+export interface PricingSheet {
+  sheetId: string | null;
+  kind: 'MASTER' | 'CONTRACTOR' | null;
+  source: PricingSource;
+  version: number | null;
+  effectiveFrom: string | null;
+  title: string | null;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
+  rows: PricingRow[];
+}
+
+/** A master template version on the Pricing Terms page. */
+export interface PricingTermsVersion {
+  sheetId: string;
+  version: number;
+  state: 'EFFECTIVE' | 'SCHEDULED' | 'SUPERSEDED';
+  effectiveFrom: string;
+  title: string | null;
+  note: string | null;
+  fileName: string | null;
+  sizeBytes: number | null;
+  createdBy: string | null;
+  createdAt: string;
+  acceptances: number;
+  rows: PricingRow[];
+}
+
+export interface PricingRowRequest {
+  categoryId: string | null;
+  baseFee: number;
+  pctThreshold: number;
+  pctRate: number;
+  maxFee: number | null;
+}
+
+/** A new sheet version. `effectiveFrom` (yyyy-MM-dd) and `title` matter for the master template only. */
+export interface PricingSheetRequest {
+  effectiveFrom: string | null;
+  title: string | null;
+  note: string | null;
+  rows: PricingRowRequest[];
+}
+
+export interface CategoryOption {
+  categoryId: string;
+  name: string;
+}
+
+/** The default-row rule the overview shows; `platformDefault` when no sheet applies. */
 export interface FeeRule {
-  policyId: string | null;
+  sheetId: string | null;
   version: number | null;
   baseFee: number;
   pctThreshold: number;
@@ -379,6 +444,9 @@ export interface ContractorFeeOverview {
   email: string | null;
   isActive: boolean | null;
   rule: FeeRule;
+  pricingSource: PricingSource;
+  sheetVersion: number | null;
+  termsVersion: number | null;
   jobsThisMonth: number;
   accruedThisMonth: number;
   unbilledJobs: number;
@@ -392,6 +460,7 @@ export interface PlatformFeeRow {
   feeId: string;
   maintenanceId: string;
   title: string;
+  categoryName: string | null;
   jobAmount: number;
   baseFee: number;
   pctFee: number;
@@ -401,7 +470,8 @@ export interface PlatformFeeRow {
   status: 'ACCRUED' | 'INVOICED' | 'WAIVED';
   invoiceId: string | null;
   invoiceNumber: string | null;
-  ruleVersion: number | null;
+  pricingSource: PricingSource | null;
+  sheetVersion: number | null;
 }
 
 export interface PlatformInvoiceRow {
@@ -416,6 +486,15 @@ export interface PlatformInvoiceRow {
   dueDate: string;
   paidAt: string | null;
   paidNote: string | null;
+  voidedAt: string | null;
+  voidNote: string | null;
+}
+
+export interface TermsAcceptance {
+  sheetId: string;
+  version: number | null;
+  acceptedAt: string;
+  ipAddress: string | null;
 }
 
 export interface ContractorFeeDetail {
@@ -423,7 +502,9 @@ export interface ContractorFeeDetail {
   companyName: string | null;
   email: string | null;
   rule: FeeRule;
-  history: FeeRule[];
+  pricing: PricingSheet;
+  overrideHistory: PricingSheet[];
+  termsAccepted: TermsAcceptance | null;
   jobsThisMonth: number;
   accruedThisMonth: number;
   unbilledJobs: number;
@@ -435,19 +516,51 @@ export interface ContractorFeeDetail {
   invoices: PlatformInvoiceRow[];
 }
 
-export interface FeePolicyRequest {
-  baseFee: number;
-  pctThreshold: number;
-  pctRate: number;
-  maxFee: number | null;
-  note: string | null;
+/** A statement on the Statements tab, with who owes it. */
+export interface PlatformStatementRow extends PlatformInvoiceRow {
+  contractorId: string;
+  companyName: string | null;
+  email: string | null;
+  notifiedAt: string | null;
 }
 
-export interface IssueResult {
+export interface PlatformStatementDetail {
+  statement: PlatformStatementRow;
+  lines: PlatformFeeRow[];
+}
+
+export interface StatementRunFailure {
+  contractorId: string | null;
+  message: string;
+}
+
+export interface StatementRun {
+  runId: string;
   period: string;
-  statementsIssued: number;
+  periodStart: string;
+  periodEnd: string;
+  triggerType: 'SCHEDULED' | 'MANUAL';
+  requestedBy: string | null;
+  requestedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  status: 'REQUESTED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  contractorsSeen: number;
+  statementsCreated: number;
+  statementsUpdated: number;
   feesBilled: number;
+  feesCarried: number;
   totalBilled: number;
+  failures: StatementRunFailure[];
+}
+
+/** A reconcile has been queued; rental-service runs it within seconds. */
+export interface ReconcileRequested {
+  runId: string;
+  period: string;
+  periodStart: string;
+  periodEnd: string;
+  dueDate: string;
 }
 
 /** One selectable Business Service (GET /contractors/services) — named after a maintenance category. */

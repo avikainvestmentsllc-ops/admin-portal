@@ -15,6 +15,7 @@ import MileageRatesPage from './pages/MileageRatesPage';
 import ContractorsPage from './pages/ContractorsPage';
 import PlatformFeesPage from './pages/PlatformFeesPage';
 import ContractorFeesPage from './pages/ContractorFeesPage';
+import PricingTermsPage from './pages/PricingTermsPage';
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/contractors" element={<ContractorsPage />} />
             <Route path="/platform-fees" element={<PlatformFeesPage />} />
             <Route path="/platform-fees/:contractorId" element={<ContractorFeesPage />} />
+            <Route path="/pricing-terms" element={<PricingTermsPage />} />
           </Route>
           {/* /dashboard is the default landing page after login */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
