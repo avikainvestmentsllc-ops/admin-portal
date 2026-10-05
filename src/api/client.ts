@@ -51,7 +51,7 @@ export class ApiRequestError extends Error {
   errorCode: string;
   status: number;
   constructor(status: number, body: ApiError) {
-    super(body.errorDescription || 'Request failed');
+    super(body.errorDescription || 'Something went wrong! Please try again later.');
     this.errorCode = body.errorCode;
     this.status = status;
   }
