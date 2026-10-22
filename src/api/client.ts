@@ -22,6 +22,7 @@ import type {
   PackageOption,
   PackageRequest,
   PackageView,
+  PlanFeatureOption,
   ResetTokenInfo,
   UpdateLandlordRequest,
   PricingSheetRequest,
@@ -46,6 +47,7 @@ const MILEAGE_RATES = `${API_BASE}/managehouselease/mileage-rates`;
 const CONTRACTORS = `${API_BASE}/managehouselease/contractors`;
 const PLATFORM_FEES = `${API_BASE}/managehouselease/platform-fees`;
 const PRICING_TERMS = `${API_BASE}/managehouselease/pricing-terms`;
+const REFUND_REQUESTS = `${API_BASE}/managehouselease/refund-requests`;
 
 export class ApiRequestError extends Error {
   errorCode: string;
@@ -249,6 +251,16 @@ export function updatePackage(packageId: string, body: PackageRequest): Promise<
   });
 }
 
+/** The features a package can include. */
+export function listPlanFeatures(): Promise<PlanFeatureOption[]> {
+  return authJson<PlanFeatureOption[]>(`${PACKAGES}/features`);
+}
+
+/** Pushes the package's current features to the landlords already on it. */
+export function applyPackageFeatures(packageId: string): Promise<{ updated: number }> {
+  return authJson<{ updated: number }>(`${PACKAGES}/${packageId}/features/apply`, { method: 'POST' });
+}
+
 // ---------- Add-on catalogue API ----------
 
 export function listAllAddons(): Promise<AddonView[]> {
@@ -407,4 +419,111 @@ export async function pricingTermsFileUrl(sheetId: string): Promise<string> {
   const res = await authFetch(`${PRICING_TERMS}/${sheetId}/file`);
   if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
   return URL.createObjectURL(await res.blob());
+}
+
+// ---------- Contractor refund requests ----------
+
+export interface RefundRequestView {
+  requestId: string;
+  status: 'REQUESTED' | 'APPROVED' | 'DECLINED' | 'PROCESSING' | 'REFUNDED' | 'FAILED';
+  reason: string;
+  note: string | null;
+  adminNote: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  failure: string | null;
+  createdAt: string;
+  accountId: string;
+  landlordName: string | null;
+  contractorId: string | null;
+  contractorName: string | null;
+  maintenanceId: string;
+  jobTitle: string | null;
+  amount: number | null;
+  platformFee: number | null;
+  processingFee: number | null;
+  method: string | null;
+  paymentStatus: string | null;
+  paymentIntentId: string | null;
+  paidAt: string | null;
+}
+
+export function listRefundRequests(status?: string): Promise<RefundRequestView[]> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return authJson<RefundRequestView[]>(`${REFUND_REQUESTS}${q}`);
+}
+
+export function decideRefundRequest(requestId: string, decision: 'approve' | 'decline', adminNote: string): Promise<RefundRequestView> {
+  return authJson<RefundRequestView>(`${REFUND_REQUESTS}/${requestId}/${decision}`, {
+    method: 'POST',
+    body: JSON.stringify({ adminNote: adminNote.trim() || null }),
+  });
+}
+
+// ---------- Landlord account features ----------
+
+export interface AccountFeatures {
+  esignEnabled: boolean;
+  rentCollectionEnabled: boolean;
+  contractorEnabled: boolean;
+  /** Plan features on the account's current package (what it joined with). */
+  planFeatures: string[];
+}
+
+export function getAccountFeatures(accountId: string): Promise<AccountFeatures> {
+  return authJson<AccountFeatures>(`${ONBOARDING}/${accountId}/features`);
+}
+
+export function updateAccountFeatures(accountId: string, body: Partial<Pick<AccountFeatures, 'esignEnabled' | 'rentCollectionEnabled'>>): Promise<AccountFeatures> {
+  return authJson<AccountFeatures>(`${ONBOARDING}/${accountId}/features`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+// ---------- Landlord subscriptions (Stripe) ----------
+
+const SUBSCRIPTIONS = `${API_BASE}/managehouselease/subscriptions`;
+
+export interface SubscriptionRow {
+  subscriptionId: string;
+  accountId: string;
+  customerAccountId: string | null;
+  landlordName: string | null;
+  landlordEmail: string | null;
+  planName: string | null;
+  status: 'INCOMPLETE' | 'ACTIVE' | 'PAST_DUE' | 'UNPAID' | 'CANCELED';
+  renewalPrice: number;
+  renewalDate: string | null;
+  startedAt: string | null;
+  lastPaidAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  cancelRequested: boolean;
+  failureReason: string | null;
+  stripeSubscriptionId: string;
+  canceledAt: string | null;
+  /** A downgrade booked for the renewal. */
+  scheduledPlanName: string | null;
+  scheduledPrice: number | null;
+  scheduledOn: string | null;
+  /** Why the landlord cancelled (TOO_EXPENSIVE, MISSING_FEATURES, NOT_USING, SWITCHING_PROVIDER, TEMPORARY, OTHER). */
+  cancelReason: string | null;
+  cancelComment: string | null;
+}
+
+export interface SubscriptionTotals { active: number; monthlyRecurring: number; pastDue: number; renewingIn7Days: number; cancelling: number }
+export interface SubscriptionPage { items: SubscriptionRow[]; page: number; size: number; total: number; totals: SubscriptionTotals }
+export interface SubscriptionInvoice { billedAt: string; subtotal: number; tax: number; total: number; stripeInvoiceId: string }
+export interface SubscriptionDetail { subscription: SubscriptionRow; invoices: SubscriptionInvoice[] }
+
+export function listSubscriptions(status: string, search: string, page: number): Promise<SubscriptionPage> {
+  const q = new URLSearchParams({ page: String(page) });
+  if (status) q.set('status', status);
+  if (search.trim()) q.set('search', search.trim());
+  return authJson<SubscriptionPage>(`${SUBSCRIPTIONS}?${q}`);
+}
+
+export function getSubscription(id: string): Promise<SubscriptionDetail> {
+  return authJson<SubscriptionDetail>(`${SUBSCRIPTIONS}/${id}`);
+}
+
+export function cancelSubscription(id: string): Promise<SubscriptionDetail> {
+  return authJson<SubscriptionDetail>(`${SUBSCRIPTIONS}/${id}/cancel`, { method: 'POST' });
 }

@@ -1,7 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react';
-import { addPackage, updatePackage } from '../api/client';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { addPackage, applyPackageFeatures, listPlanFeatures, updatePackage } from '../api/client';
 import { toUserMessage } from '../api/errorMessages';
-import type { PackageRequest, PackageView } from '../api/types';
+import type { PackageRequest, PackageView, PlanFeatureOption } from '../api/types';
 import InfoTip from '../components/InfoTip';
 
 export type PackageSlideMode = 'add' | 'edit';
@@ -59,6 +59,41 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   // Id of the package created by this panel's own add, once saved — further submits update it.
   const [createdId, setCreatedId] = useState<string | null>(null);
+  // What the package includes: new sign-ups and plan changes get this; landlords already on it keep theirs.
+  const [catalog, setCatalog] = useState<PlanFeatureOption[]>([]);
+  const [features, setFeatures] = useState<string[]>(pkg?.features ?? []);
+  const [savedFeatures, setSavedFeatures] = useState<string[]>(pkg?.features ?? []);
+  const [confirmApply, setConfirmApply] = useState(false);
+  const [applying, setApplying] = useState(false);
+  useEffect(() => { listPlanFeatures().then(setCatalog).catch(() => setCatalog([])); }, []);
+  const groups = useMemo(() => {
+    const out: Record<string, PlanFeatureOption[]> = {};
+    for (const f of catalog) (out[f.group] ??= []).push(f);
+    return Object.entries(out);
+  }, [catalog]);
+  const featuresChanged = useMemo(
+    () => [...features].sort().join() !== [...savedFeatures].sort().join(), [features, savedFeatures]);
+
+  function toggleFeature(code: string, on: boolean) {
+    setFeatures((prev) => (on ? [...new Set([...prev, code])] : prev.filter((c) => c !== code)));
+    setSavedMessage(null); setSubmitError(null);
+  }
+
+  async function applyToExisting() {
+    const id = createdId ?? pkg?.packageId;
+    if (!id) return;
+    setApplying(true); setSubmitError(null);
+    try {
+      const r = await applyPackageFeatures(id);
+      setSavedMessage(`Applied to ${r.updated} existing landlord${r.updated === 1 ? '' : 's'}.`);
+      setConfirmApply(false);
+      onSaved();
+    } catch (err) {
+      setSubmitError(toUserMessage(err));
+    } finally {
+      setApplying(false);
+    }
+  }
 
   // Once a new package has been created, its name/price/start lock just like an existing one,
   // and the panel effectively behaves like an edit for any further changes.
@@ -115,6 +150,7 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
         packagePrice: Number(packagePrice),
         effectiveStartDateUtc: dateInputToIso(effectiveStart),
         effectiveEndDateUtc: dateInputToIso(effectiveEnd),
+        features,
       };
       if (isAdd) {
         const created = await addPackage(body);
@@ -124,6 +160,7 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
         const id = createdId ?? pkg?.packageId;
         if (id) {
           await updatePackage(id, body);
+          setSavedFeatures(features);
           setSavedMessage('Package saved successfully.');
         }
       }
@@ -222,6 +259,50 @@ export default function PackageSlideIn({ mode, pkg, onClose, onSaved }: Props) {
                 onChange={(e) => { setPackageStatus(e.target.checked); setSavedMessage(null); setSubmitError(null); }} />
               Active
             </label>
+          </fieldset>
+
+          <fieldset data-testid="package-features">
+            <legend>Features</legend>
+            <span className="field-hint" style={{ gridColumn: '1 / -1' }}>
+              Everything not listed is in every plan. Landlords keep the features they joined with; a change here applies
+              to new sign-ups and plan changes{isAdd ? '' : ' — use “Apply to existing” to give it to current landlords too'}.
+            </span>
+            {groups.map(([group, items]) => (
+              <div key={group} style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span className="muted" style={{ font: '600 10px var(--mono)', letterSpacing: '.08em', textTransform: 'uppercase' }}>{group}</span>
+                {items.map((f) => (
+                  <div key={f.code} className="addon-row">
+                    <label className="checkbox">
+                      <input type="checkbox" checked={features.includes(f.code)} data-testid={`package-feature-${f.code}`}
+                        onChange={(e) => toggleFeature(f.code, e.target.checked)} />
+                      {f.name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {!isAdd && (pkg?.subscribers ?? 0) > 0 && (
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {confirmApply ? (
+                  <div className="notice" role="alert">
+                    Give the saved features of this package to its {pkg?.subscribers} current landlord{pkg?.subscribers === 1 ? '' : 's'}?
+                    Features they had that the package no longer includes are removed.
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button type="button" className="ghost sm" onClick={() => setConfirmApply(false)}>Not now</button>
+                      <button type="button" className="btn sm" disabled={applying} onClick={() => void applyToExisting()} data-testid="package-apply-confirm">
+                        {applying ? 'Applying…' : 'Yes, apply'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="ghost" disabled={featuresChanged} data-testid="package-apply-existing"
+                    title={featuresChanged ? 'Save the changes first' : undefined} onClick={() => setConfirmApply(true)}>
+                    Apply to existing landlords ({pkg?.subscribers})
+                  </button>
+                )}
+                {featuresChanged && <span className="field-hint">Save first — “Apply to existing” uses the saved features.</span>}
+              </div>
+            )}
           </fieldset>
 
           <div className="slide-actions">
