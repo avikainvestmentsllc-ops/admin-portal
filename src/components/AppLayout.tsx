@@ -12,6 +12,8 @@ const NAV_ITEMS: { label: string; short: string; to: string; icon: IconName }[] 
   { label: 'Mileage Rates', short: 'Mileage', to: '/mileage-rates', icon: 'mileage' },
   { label: 'Contractors', short: 'Contractors', to: '/contractors', icon: 'contractors' },
   { label: 'Platform Fees', short: 'Fees', to: '/platform-fees', icon: 'fees' },
+  { label: 'Subscriptions', short: 'Subs', to: '/subscriptions', icon: 'subscriptions' },
+  { label: 'Refund Requests', short: 'Refunds', to: '/refund-requests', icon: 'refunds' },
   { label: 'Pricing Template', short: 'Template', to: '/pricing-terms', icon: 'pricing' },
 ];
 

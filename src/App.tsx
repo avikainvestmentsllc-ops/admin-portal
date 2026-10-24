@@ -14,6 +14,8 @@ import LandlordBillingPage from './pages/LandlordBillingPage';
 import MileageRatesPage from './pages/MileageRatesPage';
 import ContractorsPage from './pages/ContractorsPage';
 import PlatformFeesPage from './pages/PlatformFeesPage';
+import RefundRequestsPage from './pages/RefundRequestsPage';
+import SubscriptionsPage from './pages/SubscriptionsPage';
 import ContractorFeesPage from './pages/ContractorFeesPage';
 import PricingTermsPage from './pages/PricingTermsPage';
 
@@ -41,6 +43,8 @@ export default function App() {
             <Route path="/mileage-rates" element={<MileageRatesPage />} />
             <Route path="/contractors" element={<ContractorsPage />} />
             <Route path="/platform-fees" element={<PlatformFeesPage />} />
+            <Route path="/refund-requests" element={<RefundRequestsPage />} />
+            <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/platform-fees/:contractorId" element={<ContractorFeesPage />} />
             <Route path="/pricing-terms" element={<PricingTermsPage />} />
           </Route>

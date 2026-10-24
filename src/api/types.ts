@@ -171,6 +171,17 @@ export interface PackageView {
   effectiveEndDateUtc: string | null;
   createTimeUtc: string | null;
   updateTimeUtc: string | null;
+  /** plan_feature codes the package includes now (what new sign-ups and plan changes get). */
+  features: string[];
+  /** Landlords on this package now — who "Apply to existing" reaches. */
+  subscribers: number;
+}
+
+/** A feature a package can include; everything else is in every plan. */
+export interface PlanFeatureOption {
+  code: string;
+  name: string;
+  group: string;
 }
 
 export interface PackageRequest {
@@ -180,6 +191,7 @@ export interface PackageRequest {
   packagePrice: number;
   effectiveStartDateUtc?: string | null;
   effectiveEndDateUtc?: string | null;
+  features?: string[];
 }
 
 // ---------- Add-on catalogue (landlord_package_addon) ----------
@@ -268,6 +280,10 @@ export interface ContractorDetailView {
   isActive: boolean | null;
   /** ISO instant of the administrator's approval; null until the business has been activated. */
   activatedAt: string | null;
+  /** "Get paid in the app" switched on for this business (off by default). */
+  inAppPaymentsEnabled?: boolean;
+  /** Stripe payout setup finished — context for the switch. */
+  payoutsReady?: boolean;
 }
 
 /**
@@ -292,6 +308,8 @@ export interface ContractorUpdateRequest {
   insurancePolicyNumber: string | null;
   insuranceExpiryDate: string | null;
   isActive: boolean;
+  /** "Get paid in the app" for this business; omitted keeps the current setting. */
+  inAppPaymentsEnabled?: boolean;
 }
 
 export interface OnboardLandlordRequest {

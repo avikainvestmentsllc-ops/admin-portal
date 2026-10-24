@@ -53,6 +53,7 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
   const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [inAppPayments, setInAppPayments] = useState(false);
 
   const [showErrors, setShowErrors] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -86,6 +87,7 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
         setInsurancePolicyNumber(d.insurancePolicyNumber ?? '');
         setInsuranceExpiryDate(d.insuranceExpiryDate ?? '');
         setIsActive(d.isActive ?? false);
+        setInAppPayments(d.inAppPaymentsEnabled ?? false);
       })
       .catch((err) => setLoadError(toUserMessage(err, 'Failed to load contractor')))
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -167,6 +169,7 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
         insurancePolicyNumber: insurancePolicyNumber.trim() || null,
         insuranceExpiryDate: insuranceExpiryDate || null,
         isActive,
+        inAppPaymentsEnabled: inAppPayments,
       };
       const saved = await updateContractor(contractor.contractorId, body);
       setDetail(saved);
@@ -228,6 +231,26 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
                   emails the contractor.
                 </p>
               )}
+            </fieldset>
+
+            <fieldset>
+              <legend>Features</legend>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={inAppPayments}
+                  onChange={(e) => { setInAppPayments(e.target.checked); setSavedMessage(null); }}
+                  data-testid="contractor-in-app-payments"
+                />
+                Get paid in the app — Stripe payouts, and landlords pay this contractor's jobs in the app
+              </label>
+              <p className="muted" data-testid="contractor-in-app-payments-note">
+                {inAppPayments
+                  ? (detail?.payoutsReady
+                    ? 'On, and payouts are set up: landlords pay this contractor\'s invoiced jobs in the app.'
+                    : 'On: the contractor sees "Get paid in the app" and can set up payouts. Until they finish, landlords mark jobs paid outside the app.')
+                  : 'Off (the default): the "Get paid in the app" card is hidden on every contractor app, and landlords mark this contractor\'s jobs paid outside the app.'}
+              </p>
             </fieldset>
 
             <fieldset>

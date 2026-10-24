@@ -1,3 +1,4 @@
+import AccountFeaturesSection from '../components/AccountFeaturesSection';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   addLandlord,
@@ -792,6 +793,9 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
                 Billing Active
               </label>
             </fieldset>
+
+            {/* Saved on its own the moment a switch changes, so it is usable when viewing too. */}
+            {mode !== 'add' && accountId && <AccountFeaturesSection accountId={accountId} />}
 
             {!readOnly && (
               <div className="slide-actions">

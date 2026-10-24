@@ -91,6 +91,8 @@ export default function PackagesPage() {
               <th>Name</th>
               <th>Price</th>
               <th>Description</th>
+              <th>Features</th>
+              <th>Landlords</th>
               <th>Effective start</th>
               <th>Status</th>
               <th>Actions</th>
@@ -98,14 +100,16 @@ export default function PackagesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="table-loading">Loading…</td></tr>
+              <tr><td colSpan={8} className="table-loading">Loading…</td></tr>
             ) : packages.length === 0 ? (
-              <tr><td colSpan={6} className="table-empty">No packages yet. Click “Add Package” to create one.</td></tr>
+              <tr><td colSpan={8} className="table-empty">No packages yet. Click “Add Package” to create one.</td></tr>
             ) : packages.map((p) => (
               <tr key={p.packageId}>
                 <td className="cell-strong">{p.packageName}</td>
                 <td className="cell-mono">{formatPrice(p.packagePrice)}</td>
                 <td style={{ whiteSpace: 'normal', maxWidth: 320 }}>{p.packageDescription || '—'}</td>
+                <td className="cell-mono">{p.features?.length ?? 0}</td>
+                <td className="cell-mono">{p.subscribers ?? 0}</td>
                 <td>
                   <div className="cell-mono">{isoToDate(p.effectiveStartDateUtc)}</div>
                   {p.effectiveEndDateUtc && <div className="cell-sub">ends {isoToDate(p.effectiveEndDateUtc)}</div>}
