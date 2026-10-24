@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import ProtectedRoute from './auth/ProtectedRoute';
+import PublicTitle from './components/PublicTitle';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -13,6 +14,8 @@ import AddonsPage from './pages/AddonsPage';
 import LandlordBillingPage from './pages/LandlordBillingPage';
 import MileageRatesPage from './pages/MileageRatesPage';
 import ContractorsPage from './pages/ContractorsPage';
+import AgentsPage from './pages/AgentsPage';
+import AgentTermsPage from './pages/AgentTermsPage';
 import PlatformFeesPage from './pages/PlatformFeesPage';
 import RefundRequestsPage from './pages/RefundRequestsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
@@ -23,6 +26,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <PublicTitle />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -42,6 +46,8 @@ export default function App() {
             <Route path="/addons" element={<AddonsPage />} />
             <Route path="/mileage-rates" element={<MileageRatesPage />} />
             <Route path="/contractors" element={<ContractorsPage />} />
+            <Route path="/agents" element={<AgentsPage />} />
+            <Route path="/agent-terms" element={<AgentTermsPage />} />
             <Route path="/platform-fees" element={<PlatformFeesPage />} />
             <Route path="/refund-requests" element={<RefundRequestsPage />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />

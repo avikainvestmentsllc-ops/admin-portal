@@ -527,3 +527,116 @@ export function getSubscription(id: string): Promise<SubscriptionDetail> {
 export function cancelSubscription(id: string): Promise<SubscriptionDetail> {
   return authJson<SubscriptionDetail>(`${SUBSCRIPTIONS}/${id}/cancel`, { method: 'POST' });
 }
+
+// ---------- Real estate agents ----------
+
+const AGENTS = '/managehouselease/agents';
+
+export interface AgentRow {
+  agentId: string;
+  name: string;
+  email: string;
+  phone: string;
+  companyName: string | null;
+  licensedStates: string[];
+  insuranceExpiresOn: string;
+  status: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
+  createdAt: string;
+}
+
+export interface AgentDetail {
+  agentId: string;
+  userId: string;
+  status: AgentRow['status'];
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  formattedAddress: string | null;
+  companyName: string | null;
+  taxIdType: 'EIN' | 'SSN';
+  taxIdLast4: string;
+  dlNumber: string;
+  dlState: string;
+  insuranceCarrier: string;
+  insurancePolicy: string;
+  insuranceExpiresOn: string;
+  licenses: { state: string; licenseNumber: string; expiresOn: string | null }[];
+  documents: { key: string; label: string; fileName: string }[];
+  termsVersion: string;
+  termsAcceptedAt: string;
+  termsIp: string | null;
+  rejectionReason: string | null;
+  verifiedBy: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+}
+
+export function listAgents(status?: string): Promise<AgentRow[]> {
+  return authJson<AgentRow[]>(`${AGENTS}${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+}
+
+export function getAgent(agentId: string): Promise<AgentDetail> {
+  return authJson<AgentDetail>(`${AGENTS}/${agentId}`);
+}
+
+export function revealAgentTaxId(agentId: string): Promise<{ type: string; value: string }> {
+  return authJson(`${AGENTS}/${agentId}/tax-id`, { method: 'POST' });
+}
+
+export function decideAgent(agentId: string, action: 'activate' | 'reject' | 'suspend', reason?: string): Promise<AgentDetail> {
+  return authJson<AgentDetail>(`${AGENTS}/${agentId}/${action}`, {
+    method: 'PUT',
+    body: action === 'activate' ? undefined : JSON.stringify({ reason }),
+  });
+}
+
+/** A document on file, as a blob URL for PdfPreview (images show in the same frame). */
+export async function loadAgentDocument(agentId: string, key: string): Promise<string> {
+  const res = await authFetch(`${AGENTS}/${agentId}/documents/${key}`);
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return URL.createObjectURL(await res.blob());
+}
+
+// ---------- Agent agreement (platform terms agents sign at sign-up) ----------
+
+const AGENT_TERMS = '/managehouselease/agent-terms';
+
+export interface AgentTermsVersion {
+  termsId: string;
+  version: number;
+  title: string | null;
+  effectiveFrom: string;
+  state: 'EFFECTIVE' | 'SCHEDULED' | 'SUPERSEDED';
+  sizeBytes: number;
+  createdBy: string | null;
+  createdAt: string;
+  signedCount: number;
+}
+
+export function listAgentTerms(): Promise<AgentTermsVersion[]> {
+  return authJson<AgentTermsVersion[]>(AGENT_TERMS);
+}
+
+export async function createAgentTerms(file: File, effectiveDate: string, title: string): Promise<AgentTermsVersion> {
+  const body = new FormData();
+  body.append('file', file);
+  const q = new URLSearchParams({ effectiveDate });
+  if (title.trim()) q.set('title', title.trim());
+  const res = await authFetch(`${AGENT_TERMS}?${q}`, { method: 'POST', body });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return (await res.json()) as AgentTermsVersion;
+}
+
+export async function deleteAgentTerms(termsId: string): Promise<void> {
+  const res = await authFetch(`${AGENT_TERMS}/${termsId}`, { method: 'DELETE' });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+}
+
+export async function loadAgentTermsFile(termsId: string): Promise<string> {
+  const res = await authFetch(`${AGENT_TERMS}/${termsId}/file`);
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return URL.createObjectURL(await res.blob());
+}

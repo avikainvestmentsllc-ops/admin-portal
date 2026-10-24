@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { AppShellProvider, useShellState } from './AppShell';
@@ -11,6 +11,8 @@ const NAV_ITEMS: { label: string; short: string; to: string; icon: IconName }[] 
   { label: 'Add-ons', short: 'Add-ons', to: '/addons', icon: 'addons' },
   { label: 'Mileage Rates', short: 'Mileage', to: '/mileage-rates', icon: 'mileage' },
   { label: 'Contractors', short: 'Contractors', to: '/contractors', icon: 'contractors' },
+  { label: 'Real Estate Agents', short: 'Agents', to: '/agents', icon: 'agents' },
+  { label: 'Agent Agreement', short: 'Agreement', to: '/agent-terms', icon: 'pricing' },
   { label: 'Platform Fees', short: 'Fees', to: '/platform-fees', icon: 'fees' },
   { label: 'Subscriptions', short: 'Subs', to: '/subscriptions', icon: 'subscriptions' },
   { label: 'Refund Requests', short: 'Refunds', to: '/refund-requests', icon: 'refunds' },
@@ -41,6 +43,10 @@ function Shell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { header, toast, showToast, summary } = useShellState();
+  // The browser tab shows the page too ("Real Estate Agents · Admin Portal").
+  useEffect(() => {
+    document.title = header?.title ? `${header.title} · Admin Portal · My House Lease` : 'Admin Portal · My House Lease';
+  }, [header?.title]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeDrawer = () => setDrawerOpen(false);
 
