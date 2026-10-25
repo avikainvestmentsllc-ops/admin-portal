@@ -1,13 +1,17 @@
 import AccountFeaturesSection from '../components/AccountFeaturesSection';
+import PdfPreview from '../components/PdfPreview';
+import { formatEt } from '../utils/etTime';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   addLandlord,
   getLandlordDetails,
+  loadLandlordTermsFile,
   updateLandlord,
   ApiRequestError,
 } from '../api/client';
 import { toUserMessage } from '../api/errorMessages';
 import type {
+  LandlordAgreementView,
   LandlordDetailsResponse,
   OnboardLandlordRequest,
   PackageOption,
@@ -148,6 +152,9 @@ const EMPTY: FormState = {
 export default function LandlordSlideIn({ mode, accountId, packages, onClose, onSaved }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [loading, setLoading] = useState(mode !== 'add');
+  // The landlord agreement the account accepted at sign-up (null: none), and the PDF preview of that version.
+  const [agreement, setAgreement] = useState<LandlordAgreementView | null>(null);
+  const [viewingAgreement, setViewingAgreement] = useState(false);
   const [saving, setSaving] = useState(false);
   // Load failure only — shown inline at the top since no form is rendered yet.
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -183,6 +190,7 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
         if (!active) return;
         const a = d.account;
         const p = d.packages[0];
+        setAgreement(d.agreement ?? null);
         setForm({
           email: a.email,
           phoneNumber: formatPhone(a.phoneNumber),
@@ -794,6 +802,33 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
               </label>
             </fieldset>
 
+            {mode !== 'add' && accountId && (
+              <fieldset data-testid="landlord-agreement-accepted">
+                <legend>Landlord Agreement</legend>
+                {agreement ? (
+                  <dl className="detail-list" style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '6px 16px', margin: 0, gridColumn: '1 / -1' }}>
+                    <dt className="muted">Version</dt>
+                    <dd style={{ margin: 0 }}>{agreement.label ?? `Version ${agreement.version}`}</dd>
+                    <dt className="muted">Accepted</dt>
+                    <dd style={{ margin: 0 }} data-testid="landlord-agreement-accepted-at">{formatEt(agreement.acceptedAt)}</dd>
+                    {agreement.acceptedByEmail && (<><dt className="muted">Accepted by</dt><dd style={{ margin: 0 }}>{agreement.acceptedByEmail}</dd></>)}
+                    {agreement.ipAddress && (<><dt className="muted">IP address</dt><dd style={{ margin: 0 }} className="cell-mono">{agreement.ipAddress}</dd></>)}
+                    {agreement.effectiveFrom && (<><dt className="muted">Version effective</dt><dd style={{ margin: 0 }}>{formatEt(agreement.effectiveFrom)}</dd></>)}
+                    <dt className="muted">PDF</dt>
+                    <dd style={{ margin: 0 }}>
+                      <button type="button" className="ghost sm" onClick={() => setViewingAgreement(true)} data-testid="landlord-agreement-view">
+                        View the accepted PDF
+                      </button>
+                    </dd>
+                  </dl>
+                ) : (
+                  <p className="muted" style={{ margin: 0, gridColumn: '1 / -1' }}>
+                    No landlord agreement on record — the account was onboarded here, or signed up before the agreement was required.
+                  </p>
+                )}
+              </fieldset>
+            )}
+
             {/* Saved on its own the moment a switch changes, so it is usable when viewing too. */}
             {mode !== 'add' && accountId && <AccountFeaturesSection accountId={accountId} />}
 
@@ -808,6 +843,10 @@ export default function LandlordSlideIn({ mode, accountId, packages, onClose, on
           </form>
         )}
       </aside>
+      {viewingAgreement && agreement && (
+        <PdfPreview title={`Landlord agreement v${agreement.version}`} load={() => loadLandlordTermsFile(agreement.termsId)}
+          onClose={() => setViewingAgreement(false)} />
+      )}
     </div>
   );
 }

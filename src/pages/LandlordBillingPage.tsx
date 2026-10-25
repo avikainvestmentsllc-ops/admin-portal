@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getLandlordBilling, getLandlordDetails, listPackages, ApiRequestError } from '../api/client';
-import type { LandlordBillingResponse, LandlordPackageView, PackageOption } from '../api/types';
+import { getLandlordBilling, getLandlordDetails, listPackages, loadLandlordTermsFile, ApiRequestError } from '../api/client';
+import PdfPreview from '../components/PdfPreview';
+import { formatEt } from '../utils/etTime';
+import type { LandlordAgreementView, LandlordBillingResponse, LandlordPackageView, PackageOption } from '../api/types';
 import { money } from '../components/AppLayout';
 import { usePageHeader, useToast } from '../components/AppShell';
 import ChangePackageSlideIn from './ChangePackageSlideIn';
@@ -50,6 +52,9 @@ export default function LandlordBillingPage() {
   const [error, setError] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
   const [editSeed, setEditSeed] = useState<LandlordPackageView | null>(null);
+  // The landlord agreement accepted at sign-up (null: none on record) and its PDF preview.
+  const [agreement, setAgreement] = useState<LandlordAgreementView | null>(null);
+  const [viewingAgreement, setViewingAgreement] = useState(false);
 
   const account = data?.account;
   const billing = data?.billing ?? [];
@@ -69,6 +74,7 @@ export default function LandlordBillingPage() {
       const [bill, details, opts] = await Promise.all([getLandlordBilling(accountId), getLandlordDetails(accountId), listPackages()]);
       setData(bill);
       setPackages(details.packages);
+      setAgreement(details.agreement ?? null);
       setOptions(opts);
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : 'Failed to load billing');
@@ -139,8 +145,29 @@ export default function LandlordBillingPage() {
               {[`${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim(), contact.email, contact.phoneNumber].filter(Boolean).join(' · ') || '—'}
             </div>
           )}
+          <div className="detail-wide" data-testid="landlord-agreement-accepted">
+            <span className="detail-label">Landlord agreement</span>
+            {agreement ? (
+              <>
+                <span data-testid="landlord-agreement-version">{agreement.label ?? `Version ${agreement.version}`}</span>
+                {' · accepted '}<span data-testid="landlord-agreement-accepted-at">{formatEt(agreement.acceptedAt)}</span>
+                {agreement.acceptedByEmail ? ` by ${agreement.acceptedByEmail}` : ''}
+                {agreement.ipAddress ? ` · IP ${agreement.ipAddress}` : ''}
+                {' '}
+                <button type="button" className="ghost sm" style={{ marginLeft: 6 }} onClick={() => setViewingAgreement(true)} data-testid="landlord-agreement-view">
+                  View PDF
+                </button>
+              </>
+            ) : (
+              <span className="muted">None on record — onboarded here, or signed up before the agreement was required.</span>
+            )}
+          </div>
         </div>
       </div>
+      {viewingAgreement && agreement && (
+        <PdfPreview title={`Landlord agreement v${agreement.version}`} load={() => loadLandlordTermsFile(agreement.termsId)}
+          onClose={() => setViewingAgreement(false)} />
+      )}
 
       <div className="bill-grid">
         <div className="bill-card">

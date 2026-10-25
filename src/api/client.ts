@@ -640,3 +640,44 @@ export async function loadAgentTermsFile(termsId: string): Promise<string> {
   if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
   return URL.createObjectURL(await res.blob());
 }
+
+// ---------- Landlord agreement (platform terms landlords accept at sign-up) ----------
+
+const LANDLORD_TERMS = '/managehouselease/landlord-terms';
+
+export interface LandlordTermsVersion {
+  termsId: string;
+  version: number;
+  title: string | null;
+  effectiveFrom: string;
+  state: 'EFFECTIVE' | 'SCHEDULED' | 'SUPERSEDED';
+  sizeBytes: number;
+  createdBy: string | null;
+  createdAt: string;
+  acceptedCount: number;
+}
+
+export function listLandlordTerms(): Promise<LandlordTermsVersion[]> {
+  return authJson<LandlordTermsVersion[]>(LANDLORD_TERMS);
+}
+
+export async function createLandlordTerms(file: File, effectiveDate: string, title: string): Promise<LandlordTermsVersion> {
+  const body = new FormData();
+  body.append('file', file);
+  const q = new URLSearchParams({ effectiveDate });
+  if (title.trim()) q.set('title', title.trim());
+  const res = await authFetch(`${LANDLORD_TERMS}?${q}`, { method: 'POST', body });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return (await res.json()) as LandlordTermsVersion;
+}
+
+export async function deleteLandlordTerms(termsId: string): Promise<void> {
+  const res = await authFetch(`${LANDLORD_TERMS}/${termsId}`, { method: 'DELETE' });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+}
+
+export async function loadLandlordTermsFile(termsId: string): Promise<string> {
+  const res = await authFetch(`${LANDLORD_TERMS}/${termsId}/file`);
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return URL.createObjectURL(await res.blob());
+}

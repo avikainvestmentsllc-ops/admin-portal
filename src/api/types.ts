@@ -109,9 +109,24 @@ export interface LandlordPackageView {
   updateTimeUtc: string | null;
 }
 
+/** The landlord platform agreement an account accepted at sign-up (V77). */
+export interface LandlordAgreementView {
+  termsId: string;
+  version: number;
+  title: string | null;
+  label: string | null;
+  effectiveFrom: string | null;
+  acceptedAt: string;
+  acceptedByEmail: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
 export interface LandlordDetailsResponse {
   account: LandlordAccountView;
   packages: LandlordPackageView[];
+  /** Null when the account accepted no agreement (onboarded by an admin, or signed up before V77). */
+  agreement: LandlordAgreementView | null;
 }
 
 // ---------- Billing (landlord_billing) ----------

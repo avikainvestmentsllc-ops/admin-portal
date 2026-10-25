@@ -16,6 +16,7 @@ import MileageRatesPage from './pages/MileageRatesPage';
 import ContractorsPage from './pages/ContractorsPage';
 import AgentsPage from './pages/AgentsPage';
 import AgentTermsPage from './pages/AgentTermsPage';
+import LandlordTermsPage from './pages/LandlordTermsPage';
 import PlatformFeesPage from './pages/PlatformFeesPage';
 import RefundRequestsPage from './pages/RefundRequestsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/contractors" element={<ContractorsPage />} />
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/agent-terms" element={<AgentTermsPage />} />
+            <Route path="/landlord-terms" element={<LandlordTermsPage />} />
             <Route path="/platform-fees" element={<PlatformFeesPage />} />
             <Route path="/refund-requests" element={<RefundRequestsPage />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />

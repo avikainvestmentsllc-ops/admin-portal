@@ -12,6 +12,7 @@ const NAV_ITEMS: { label: string; short: string; to: string; icon: IconName }[] 
   { label: 'Mileage Rates', short: 'Mileage', to: '/mileage-rates', icon: 'mileage' },
   { label: 'Contractors', short: 'Contractors', to: '/contractors', icon: 'contractors' },
   { label: 'Real Estate Agents', short: 'Agents', to: '/agents', icon: 'agents' },
+  { label: 'Landlord Agreement', short: 'Landlord', to: '/landlord-terms', icon: 'pricing' },
   { label: 'Agent Agreement', short: 'Agreement', to: '/agent-terms', icon: 'pricing' },
   { label: 'Platform Fees', short: 'Fees', to: '/platform-fees', icon: 'fees' },
   { label: 'Subscriptions', short: 'Subs', to: '/subscriptions', icon: 'subscriptions' },
