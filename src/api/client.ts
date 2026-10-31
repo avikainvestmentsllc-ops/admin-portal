@@ -530,7 +530,7 @@ export function cancelSubscription(id: string): Promise<SubscriptionDetail> {
 
 // ---------- Real estate agents ----------
 
-const AGENTS = '/managehouselease/agents';
+const AGENTS = `${API_BASE}/managehouselease/agents`;
 
 export interface AgentRow {
   agentId: string;
@@ -602,7 +602,7 @@ export async function loadAgentDocument(agentId: string, key: string): Promise<s
 
 // ---------- Agent agreement (platform terms agents sign at sign-up) ----------
 
-const AGENT_TERMS = '/managehouselease/agent-terms';
+const AGENT_TERMS = `${API_BASE}/managehouselease/agent-terms`;
 
 export interface AgentTermsVersion {
   termsId: string;
@@ -643,7 +643,7 @@ export async function loadAgentTermsFile(termsId: string): Promise<string> {
 
 // ---------- Landlord agreement (platform terms landlords accept at sign-up) ----------
 
-const LANDLORD_TERMS = '/managehouselease/landlord-terms';
+const LANDLORD_TERMS = `${API_BASE}/managehouselease/landlord-terms`;
 
 export interface LandlordTermsVersion {
   termsId: string;
