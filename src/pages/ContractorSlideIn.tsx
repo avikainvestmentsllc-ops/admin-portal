@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { getContractor, listContractorServiceOptions, updateContractor } from '../api/client';
+import { getContractor, getContractorPaySetting, listContractorServiceOptions, updateContractor } from '../api/client';
 import { toUserMessage } from '../api/errorMessages';
 import type { ContractorDetailView, ContractorServiceOption, ContractorUpdateRequest, ContractorView } from '../api/types';
 
@@ -54,6 +54,11 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
   const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [inAppPayments, setInAppPayments] = useState(false);
+  /** The platform-wide switch (Contractors page): off overrides this contractor's own switch. */
+  const [globalPayOn, setGlobalPayOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    getContractorPaySetting().then((s) => setGlobalPayOn(s.enabled)).catch(() => setGlobalPayOn(null));
+  }, []);
 
   const [showErrors, setShowErrors] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -250,6 +255,7 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
                     ? 'On, and payouts are set up: landlords pay this contractor\'s invoiced jobs in the app.'
                     : 'On: the contractor sees "Get paid in the app" and can set up payouts. Until they finish, landlords mark jobs paid outside the app.')
                   : 'Off (the default): the "Get paid in the app" card is hidden on every contractor app, and landlords mark this contractor\'s jobs paid outside the app.'}
+                {globalPayOn === false && ' Contractor in-app payments are switched off for the whole platform (Contractors page), so this has no effect until they are switched on.'}
               </p>
             </fieldset>
 

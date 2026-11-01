@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listAllContractors, ApiRequestError } from '../api/client';
+import { listAllContractors, getContractorPaySetting, setContractorPaySetting, ApiRequestError } from '../api/client';
+import type { PlatformToggle } from '../api/client';
 import type { ContractorView } from '../api/types';
 import { useAdminSummary, usePageHeader } from '../components/AppShell';
 import ContractorSlideIn from './ContractorSlideIn';
@@ -31,6 +32,58 @@ function ContractorCard({ contractor, onEdit }: { contractor: ContractorView; on
           <div className="ob-card-actions"><button className="ghost sm" onClick={onEdit}>Edit</button></div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The platform-wide switch for contractor Stripe payouts. Off: no contractor can enrol or be paid in the app, whatever
+ * their own "Get paid in the app" switch says. rental-service picks a change up within 30 seconds.
+ */
+function ContractorPaySwitch() {
+  const [setting, setSetting] = useState<PlatformToggle | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getContractorPaySetting()
+      .then(setSetting)
+      .catch((e) => setError(e instanceof ApiRequestError ? e.message : 'Failed to load the in-app payments setting'));
+  }, []);
+
+  async function toggle(enabled: boolean) {
+    setSaving(true);
+    setError(null);
+    try {
+      setSetting(await setContractorPaySetting(enabled));
+    } catch (e) {
+      setError(e instanceof ApiRequestError ? e.message : 'Failed to save the in-app payments setting');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const on = setting?.enabled ?? false;
+  return (
+    <div className="card" data-testid="contractor-pay-switch" style={{ marginBottom: 16 }}>
+      {error && <div className="error" role="alert">{error}</div>}
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={!setting || saving}
+          onChange={(e) => toggle(e.target.checked)}
+          data-testid="contractor-pay-global"
+        />
+        <strong>Contractor in-app payments (Stripe)</strong>{' '}
+        <span className={on ? 'pill on' : 'pill off'}>{on ? 'On' : 'Off'}</span>
+      </label>
+      <p className="muted" style={{ marginTop: 6 }}>
+        {on
+          ? 'On: contractors whose own "Get paid in the app" switch is on can enrol in Stripe payouts, and landlords pay their invoiced jobs in the app. Stripe charges its payment fees; the platform charges nothing on these payments.'
+          : 'Off: no contractor can enrol in Stripe payouts or be paid in the app, whatever their own switch says. Landlords mark jobs paid outside the app.'}
+        {setting?.updatedAt && ` Last changed ${new Date(setting.updatedAt).toLocaleString()}${setting.updatedBy ? ` by ${setting.updatedBy}` : ''}.`}
+      </p>
     </div>
   );
 }
@@ -69,6 +122,7 @@ export default function ContractorsPage() {
 
   return (
     <div className="content">
+      <ContractorPaySwitch />
       {error && <div className="error" role="alert">{error}</div>}
 
       <div className="table-wrap onboarding-desktop">

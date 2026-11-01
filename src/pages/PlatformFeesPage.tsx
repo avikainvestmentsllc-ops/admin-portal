@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ApiRequestError, getStatementRun, listContractorFees, listPricingTerms, listStatementRuns, listStatements, reconcileStatements } from '../api/client';
+import { ApiRequestError, listContractorFees, listPricingTerms, listStatementRuns, listStatements, reconcileStatements } from '../api/client';
 import { toUserMessage } from '../api/errorMessages';
 import type { ContractorFeeOverview, FeeRule, PlatformStatementRow, PricingTermsVersion, StatementRun } from '../api/types';
 import { money } from '../components/AppLayout';
@@ -56,7 +56,6 @@ export default function PlatformFeesPage() {
   const [runs, setRuns] = useState<StatementRun[]>([]);
   const [openStatement, setOpenStatement] = useState<string | null>(null);
   const [template, setTemplate] = useState<{ loaded: boolean; effective: PricingTermsVersion | null; any: boolean }>({ loaded: false, effective: null, any: false });
-  const pollTimer = useRef<number | null>(null);
 
   const totals = useMemo(() => rows.reduce(
     (t, r) => ({
@@ -117,33 +116,8 @@ export default function PlatformFeesPage() {
 
   useEffect(() => { void load(); void loadRuns(); void loadTemplate(); }, [load, loadRuns, loadTemplate]);
   useEffect(() => { void loadStatements(period); }, [period, loadStatements]);
-  useEffect(() => () => { if (pollTimer.current) window.clearTimeout(pollTimer.current); }, []);
 
   const refreshAll = useCallback(async () => { await Promise.all([load(), loadStatements(period), loadRuns()]); }, [load, loadStatements, loadRuns, period]);
-
-  /** The run executes in rental-service; poll until it settles (a few seconds), then show what it did. */
-  function watch(runId: string, attempts = 0) {
-    pollTimer.current = window.setTimeout(async () => {
-      try {
-        const r = await getStatementRun(runId);
-        if (r.status === 'COMPLETED' || r.status === 'FAILED') {
-          setReconciling(false);
-          setNotice(r.status === 'FAILED'
-            ? `${r.period}: run finished with ${r.failures.length} failure${r.failures.length === 1 ? '' : 's'} — see the run log. ${r.statementsCreated} created, ${r.statementsUpdated} updated.`
-            : r.statementsCreated + r.statementsUpdated === 0
-              ? `${r.period} (${periodOfRunMonth(r.period)}): nothing to bill — every fee before the cutoff is already on a statement.`
-              : `${r.period} (${periodOfRunMonth(r.period)}): ${r.statementsCreated} statement${r.statementsCreated === 1 ? '' : 's'} created, ${r.statementsUpdated} updated, ${r.feesBilled} fee${r.feesBilled === 1 ? '' : 's'} billed, ${money(r.totalBilled)} in all${r.feesCarried > 0 ? `; ${r.feesCarried} carried to the next period` : ''}.`);
-          await refreshAll();
-          return;
-        }
-        if (attempts > 40) { setReconciling(false); setNotice(`${r.period}: the run is still going — check the run log in a moment.`); await refreshAll(); return; }
-        watch(runId, attempts + 1);
-      } catch (e) {
-        setReconciling(false);
-        setError(toUserMessage(e, 'Could not read the run'));
-      }
-    }, 2000);
-  }
 
   async function reconcile() {
     if (!/^\d{4}-\d{2}$/.test(period)) { setError('Choose the run month.'); return; }
@@ -153,9 +127,12 @@ export default function PlatformFeesPage() {
     setNotice(null);
     try {
       const r = await reconcileStatements(period);
-      setNotice(`${r.period}: run queued, waiting for the result…`);
+      // Requested runs execute once a day at 2 AM ET (rental-service PlatformStatementJob), so there is nothing to
+      // wait for here: the result shows in the run log tomorrow.
+      setReconciling(false);
+      setNotice(`${r.period}: run queued. It runs tonight at 2:00 AM ET — check the run log tomorrow.`);
       setTab('statements');
-      watch(r.runId);
+      await refreshAll();
     } catch (e) {
       setReconciling(false);
       setError(toUserMessage(e, 'Could not start the run'));

@@ -62,7 +62,7 @@ function SubscriptionSlideIn({ id, onClose, onChanged }: { id: string; onClose: 
     try {
       setDetail(await cancelSubscription(id));
       setConfirming(false);
-      toast('Cancellation requested. The landlord moves to the Free plan within a minute.');
+      toast('Cancellation requested. It runs tonight at 3:00 AM ET, when the landlord moves to the Free plan.');
       onChanged();
     } catch (e) {
       setError(toUserMessage(e, 'Could not cancel the subscription'));
@@ -122,10 +122,10 @@ function SubscriptionSlideIn({ id, onClose, onChanged }: { id: string; onClose: 
                   </table>
                 )}
               </fieldset>
-              {s.cancelRequested && <div className="notice" role="status">Cancellation requested; it runs within a minute.</div>}
+              {s.cancelRequested && <div className="notice" role="status">Cancellation requested; it runs at 3:00 AM ET.</div>}
               {confirming && (
                 <div className="error" role="alert">
-                  Cancel {s.landlordName}'s {s.planName} plan now? Stripe stops billing and the account moves to the Free plan immediately.
+                  Cancel {s.landlordName}'s {s.planName} plan now? Stripe stops billing and the account moves to the Free plan at the nightly run (3:00 AM ET).
                 </div>
               )}
             </>

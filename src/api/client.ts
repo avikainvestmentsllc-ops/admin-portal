@@ -303,6 +303,26 @@ export function updateMileageRate(mileageRateId: string, body: MileageRateReques
 
 // ---------- Contractor API ----------
 
+const PLATFORM_SETTINGS = `${API_BASE}/managehouselease/platform-settings`;
+
+/** The platform-wide contractor in-app payments switch (each contractor still needs their own). */
+export interface PlatformToggle {
+  enabled: boolean;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}
+
+export function getContractorPaySetting(): Promise<PlatformToggle> {
+  return authJson<PlatformToggle>(`${PLATFORM_SETTINGS}/contractor-in-app-payments`);
+}
+
+export function setContractorPaySetting(enabled: boolean): Promise<PlatformToggle> {
+  return authJson<PlatformToggle>(`${PLATFORM_SETTINGS}/contractor-in-app-payments`, {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
 export function listAllContractors(): Promise<ContractorView[]> {
   return authJson<ContractorView[]>(`${CONTRACTORS}/list`);
 }
