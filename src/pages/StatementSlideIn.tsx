@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getStatement, markStatementPaid, voidStatement } from '../api/client';
+import { getStatement, listStatementPayments, markStatementPaid, statementPdfUrl, voidStatement } from '../api/client';
+import type { ContractorPaymentRow } from '../api/client';
+import PdfPreview from '../components/PdfPreview';
 import { toUserMessage } from '../api/errorMessages';
 import type { PlatformStatementDetail } from '../api/types';
 import { money } from '../components/AppLayout';
@@ -23,10 +25,14 @@ export default function StatementSlideIn({ invoiceId, onClose, onChanged }: Prop
   const [voidNote, setVoidNote] = useState('');
   const [voiding, setVoiding] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [payments, setPayments] = useState<ContractorPaymentRow[]>([]);
+  const [showPdf, setShowPdf] = useState(false);
+  const loadPdf = useCallback(() => statementPdfUrl(invoiceId), [invoiceId]);
 
   const load = useCallback(async () => {
     try {
       setDetail(await getStatement(invoiceId));
+      setPayments(await listStatementPayments(invoiceId).catch(() => []));
     } catch (e) {
       setError(toUserMessage(e, 'Could not load the statement'));
     }
@@ -95,6 +101,32 @@ export default function StatementSlideIn({ invoiceId, onClose, onChanged }: Prop
                 </div>
               </fieldset>
 
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="ghost sm" onClick={() => setShowPdf(true)} data-testid="statement-pdf">View invoice PDF</button>
+              </div>
+
+              <fieldset>
+                <legend>Payments</legend>
+                <div style={{ gridColumn: '1 / -1', overflowX: 'auto' }}>
+                  {payments.length === 0 ? <p className="muted" style={{ margin: 0 }}>No payments yet.</p> : (
+                    <table className="data-table">
+                      <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Source</th><th>Reference</th></tr></thead>
+                      <tbody>
+                        {payments.map((p) => (
+                          <tr key={p.paymentId}>
+                            <td className="cell-mono">{p.paidAt ? day(p.paidAt) : '—'}</td>
+                            <td className="cell-mono">{money(p.amount)}</td>
+                            <td>{p.method === 'card' ? 'Card' : p.method === 'us_bank_account' ? 'Bank' : 'Recorded'}</td>
+                            <td>{p.source.startsWith('ONLINE') ? p.source.replace('ONLINE', 'Online') : p.source.startsWith('AUTOPAY') ? p.source.replace('AUTOPAY', 'Autopay') : p.source.replace('ADMIN', 'Recorded by admin')}</td>
+                            <td className="cell-sub">{p.reference ?? '—'}{p.recordedBy ? ` · ${p.recordedBy}` : ''}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </fieldset>
+
               <fieldset>
                 <legend>Fee lines</legend>
                 <div style={{ gridColumn: '1 / -1', overflowX: 'auto' }}>
@@ -155,6 +187,7 @@ export default function StatementSlideIn({ invoiceId, onClose, onChanged }: Prop
           </div>
         )}
       </aside>
+    {showPdf && <PdfPreview title={`Statement ${s?.invoiceNumber ?? ''}`} load={loadPdf} onClose={() => setShowPdf(false)} />}
     </div>
   );
 }

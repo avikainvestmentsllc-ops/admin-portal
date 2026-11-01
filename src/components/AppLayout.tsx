@@ -15,6 +15,8 @@ const NAV_ITEMS: { label: string; short: string; to: string; icon: IconName }[] 
   { label: 'Landlord Agreement', short: 'Landlord', to: '/landlord-terms', icon: 'pricing' },
   { label: 'Agent Agreement', short: 'Agreement', to: '/agent-terms', icon: 'pricing' },
   { label: 'Platform Fees', short: 'Fees', to: '/platform-fees', icon: 'fees' },
+  { label: 'Contractor Payments', short: 'Paid', to: '/contractor-payments', icon: 'fees' },
+  { label: 'Accounts Receivable', short: 'A/R', to: '/receivables', icon: 'fees' },
   { label: 'Subscriptions', short: 'Subs', to: '/subscriptions', icon: 'subscriptions' },
   { label: 'Refund Requests', short: 'Refunds', to: '/refund-requests', icon: 'refunds' },
   { label: 'Pricing Template', short: 'Template', to: '/pricing-terms', icon: 'pricing' },

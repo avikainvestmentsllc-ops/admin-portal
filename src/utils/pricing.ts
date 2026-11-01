@@ -63,6 +63,28 @@ export function periodLabel(periodStart: string, periodEnd: string): string {
 }
 
 /** The run month (yyyy-MM) of the latest period whose cutoff (the 20th) has passed. */
+/**
+ * The Monday (yyyy-MM-dd) of the Monday–Sunday week that closed most recently — weekly statements since 2026-11.
+ * Any date in a week names that week to the API.
+ */
+export function latestClosedWeek(now = new Date()): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sinceMonday = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - sinceMonday - 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** "Nov 2 – Nov 8, 2026": the Monday–Sunday week a date (yyyy-MM-dd) falls in. */
+export function weekLabel(isoDate: string): string {
+  const [y, m, dd] = isoDate.split('-').map(Number);
+  const d = new Date(y, m - 1, dd);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const end = new Date(d);
+  end.setDate(d.getDate() + 6);
+  const f = (x: Date) => x.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${f(d)} – ${f(end)}, ${end.getFullYear()}`;
+}
+
 export function latestClosedPeriod(now = new Date()): string {
   const d = new Date(now);
   if (d.getDate() < 20) d.setMonth(d.getMonth() - 1);

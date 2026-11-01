@@ -5,7 +5,7 @@ import { toUserMessage } from '../api/errorMessages';
 import type { ContractorFeeOverview, FeeRule, PlatformStatementRow, PricingTermsVersion, StatementRun } from '../api/types';
 import { money } from '../components/AppLayout';
 import { usePageHeader } from '../components/AppShell';
-import { latestClosedPeriod, periodLabel, sourceLabel, sourcePill } from '../utils/pricing';
+import { latestClosedWeek, periodLabel, sourceLabel, sourcePill, weekLabel } from '../utils/pricing';
 import { day } from './PricingSheetSlideIn';
 import StatementSlideIn from './StatementSlideIn';
 
@@ -22,13 +22,9 @@ function matches(r: ContractorFeeOverview, q: string): boolean {
   return q.toLowerCase().split(/\s+/).filter(Boolean).every((word) => hay.includes(word));
 }
 
-/** "Sep 20 – Oct 19" from a run month "2026-10". */
-function periodOfRunMonth(yyyyMm: string): string {
-  const [y, m] = yyyyMm.split('-').map(Number);
-  const start = new Date(y, m - 2, 20);
-  const end = new Date(y, m - 1, 19);
-  const f = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `${f(start)} – ${f(end)}`;
+/** The Monday–Sunday week of a date (yyyy-MM-dd), or "" while the input is incomplete. */
+function periodOfRunMonth(isoDate: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) ? weekLabel(isoDate) : '';
 }
 
 const RUN_PILL: Record<StatementRun['status'], string> = { REQUESTED: 'pill pending', RUNNING: 'pill pending', COMPLETED: 'pill on', FAILED: 'pill danger' };
@@ -38,8 +34,9 @@ type Tab = 'contractors' | 'statements' | 'runs';
 
 /**
  * Platform fees: every contractor and what they are charged, the statements for a period, and
- * the statement runs. Statements run on the 20th for the 20th–19th period, due the 1st; an
- * administrator can reconcile a period here — the run is idempotent, so re-running only heals.
+ * the statement runs. Statements run every Monday for the Monday–Sunday week just ended, due 7 days later; an
+ * administrator can reconcile a week here — the run is idempotent, so re-running only heals. (Monthly statements
+ * issued before 2026-11 stay readable from each contractor's page.)
  */
 export default function PlatformFeesPage() {
   const navigate = useNavigate();
@@ -49,7 +46,7 @@ export default function PlatformFeesPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [period, setPeriod] = useState(latestClosedPeriod());
+  const [period, setPeriod] = useState(latestClosedWeek());
   const [reconciling, setReconciling] = useState(false);
   const [statements, setStatements] = useState<PlatformStatementRow[]>([]);
   const [statementsLoading, setStatementsLoading] = useState(false);
@@ -120,8 +117,8 @@ export default function PlatformFeesPage() {
   const refreshAll = useCallback(async () => { await Promise.all([load(), loadStatements(period), loadRuns()]); }, [load, loadStatements, loadRuns, period]);
 
   async function reconcile() {
-    if (!/^\d{4}-\d{2}$/.test(period)) { setError('Choose the run month.'); return; }
-    if (!window.confirm(`Reconcile statements for ${period} (${periodOfRunMonth(period)})? Every unbilled fee before the cutoff goes onto one statement per contractor, due the 1st. Running it again only completes what a previous run missed.`)) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(period)) { setError('Choose a day in the week to reconcile.'); return; }
+    if (!window.confirm(`Reconcile statements for the week of ${periodOfRunMonth(period)}? Every unbilled fee before the cutoff goes onto one statement per contractor, due 7 days after the week. Running it again only completes what a previous run missed.`)) return;
     setReconciling(true);
     setError(null);
     setNotice(null);
@@ -176,14 +173,14 @@ export default function PlatformFeesPage() {
         <div className="tile"><div><div className="tile-value">{loading ? '—' : money(totals.outstanding)}</div><div className="tile-label">Issued and unpaid</div></div></div>
         <div className="tile">
           <div style={{ width: '100%' }}>
-            <div className="tile-label" style={{ marginTop: 0, marginBottom: 8 }}>Statements run on the 20th for the 20th–19th period, due the 1st. Reconcile a period:</div>
+            <div className="tile-label" style={{ marginTop: 0, marginBottom: 8 }}>Statements run every Monday for the week just ended, due 7 days later. Reconcile a week:</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Run month" className="mono" data-testid="reconcile-period" />
+              <input type="date" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="A day in the week" className="mono" data-testid="reconcile-period" />
               <button className="ghost sm" onClick={() => void reconcile()} disabled={reconciling || loading} data-testid="reconcile-run">
                 {reconciling ? 'Running…' : 'Reconcile statements'}
               </button>
             </div>
-            <div className="muted" style={{ marginTop: 6, fontSize: 11.5 }}>{/^\d{4}-\d{2}$/.test(period) ? periodOfRunMonth(period) : ''}</div>
+            <div className="muted" style={{ marginTop: 6, fontSize: 11.5 }}>{periodOfRunMonth(period)}</div>
           </div>
         </div>
       </div>
@@ -283,7 +280,7 @@ export default function PlatformFeesPage() {
               {statementsLoading ? (
                 <tr><td colSpan={8} className="table-loading">Loading…</td></tr>
               ) : statements.length === 0 ? (
-                <tr><td colSpan={8} className="table-empty">No statements for {period} ({periodOfRunMonth(period)}) yet. Reconcile the period to issue them.</td></tr>
+                <tr><td colSpan={8} className="table-empty">No statements for the week of {periodOfRunMonth(period)} yet. Reconcile the week to issue them.</td></tr>
               ) : statements.map((s) => (
                 <tr key={s.invoiceId} onClick={() => setOpenStatement(s.invoiceId)} style={{ cursor: 'pointer' }} data-testid="statement-row">
                   <td>

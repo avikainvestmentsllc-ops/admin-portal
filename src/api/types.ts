@@ -299,6 +299,10 @@ export interface ContractorDetailView {
   inAppPaymentsEnabled?: boolean;
   /** Stripe payout setup finished — context for the switch. */
   payoutsReady?: boolean;
+  /** Billing: keeps getting new work even while a statement is long overdue. */
+  billingHoldOverride?: boolean;
+  /** Billing: statements charged automatically to this method ("Visa •••• 4242"); null when autopay is off. */
+  autopayMethod?: string | null;
 }
 
 /**

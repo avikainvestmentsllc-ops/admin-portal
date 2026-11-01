@@ -441,6 +441,103 @@ export async function pricingTermsFileUrl(sheetId: string): Promise<string> {
   return URL.createObjectURL(await res.blob());
 }
 
+// ---------- Contractor billing reports (statements paid, accounts receivable) ----------
+
+export interface ContractorPaymentRow {
+  paymentId: string;
+  paidAt: string | null;
+  contractorId: string;
+  contractorName: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  method: string;
+  source: string;
+  reference: string | null;
+  recordedBy: string | null;
+}
+
+export interface ContractorPaymentsPage {
+  rows: ContractorPaymentRow[];
+  page: number;
+  size: number;
+  total: number;
+  totalAmount: number;
+  count: number;
+  online: number;
+  autopay: number;
+  recorded: number;
+}
+
+export interface ReceivableRow {
+  invoiceId: string;
+  invoiceNumber: string;
+  contractorId: string;
+  contractorName: string;
+  periodStart: string;
+  periodEnd: string;
+  dueDate: string;
+  totalAmount: number;
+  amountDue: number;
+  daysPastDue: number;
+  bucket: 'CURRENT' | '1-30' | '31-60' | '61+';
+  paymentClearing: boolean;
+  autopay: boolean;
+  onHold: boolean;
+}
+
+export interface Receivables {
+  aging: { current: number; days1to30: number; days31to60: number; days61plus: number; total: number; statements: number; contractors: number };
+  rows: ReceivableRow[];
+}
+
+function billingQuery(params: Record<string, string | number | undefined>): string {
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') q.set(k, String(v)); });
+  const s = q.toString();
+  return s ? `?${s}` : '';
+}
+
+export function listContractorPayments(p: { from?: string; to?: string; search?: string; page?: number; size?: number }): Promise<ContractorPaymentsPage> {
+  return authJson<ContractorPaymentsPage>(`${PLATFORM_FEES}/payments${billingQuery(p)}`);
+}
+
+export function getReceivables(): Promise<Receivables> {
+  return authJson<Receivables>(`${PLATFORM_FEES}/receivables`);
+}
+
+export function listStatementPayments(invoiceId: string): Promise<ContractorPaymentRow[]> {
+  return authJson<ContractorPaymentRow[]>(`${PLATFORM_FEES}/statements/${invoiceId}/payments`);
+}
+
+/** The statement's invoice PDF as a blob URL for PdfPreview. */
+export async function statementPdfUrl(invoiceId: string): Promise<string> {
+  const res = await authFetch(`${PLATFORM_FEES}/statements/${invoiceId}/pdf`);
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return URL.createObjectURL(await res.blob());
+}
+
+/** Downloads a report as a CSV file (the endpoint needs the bearer, so it is fetched, then saved). */
+export async function downloadBillingCsv(kind: 'payments' | 'receivables', params: Record<string, string | undefined> = {}): Promise<void> {
+  const res = await authFetch(`${PLATFORM_FEES}/${kind}.csv${billingQuery(params)}`);
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = kind === 'payments' ? 'contractor-payments.csv' : 'accounts-receivable.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function setBillingHoldOverride(contractorId: string, override: boolean): Promise<{ override: boolean }> {
+  return authJson<{ override: boolean }>(`${PLATFORM_FEES}/contractors/${contractorId}/billing-hold-override`, {
+    method: 'PUT',
+    body: JSON.stringify({ override }),
+  });
+}
+
 // ---------- Contractor refund requests ----------
 
 export interface RefundRequestView {

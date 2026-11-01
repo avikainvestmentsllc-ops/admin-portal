@@ -18,6 +18,8 @@ import AgentsPage from './pages/AgentsPage';
 import AgentTermsPage from './pages/AgentTermsPage';
 import LandlordTermsPage from './pages/LandlordTermsPage';
 import PlatformFeesPage from './pages/PlatformFeesPage';
+import ContractorPaymentsPage from './pages/ContractorPaymentsPage';
+import ReceivablesPage from './pages/ReceivablesPage';
 import RefundRequestsPage from './pages/RefundRequestsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import ContractorFeesPage from './pages/ContractorFeesPage';
@@ -51,6 +53,8 @@ export default function App() {
             <Route path="/agent-terms" element={<AgentTermsPage />} />
             <Route path="/landlord-terms" element={<LandlordTermsPage />} />
             <Route path="/platform-fees" element={<PlatformFeesPage />} />
+            <Route path="/contractor-payments" element={<ContractorPaymentsPage />} />
+            <Route path="/receivables" element={<ReceivablesPage />} />
             <Route path="/refund-requests" element={<RefundRequestsPage />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/platform-fees/:contractorId" element={<ContractorFeesPage />} />

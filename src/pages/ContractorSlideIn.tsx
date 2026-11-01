@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { getContractor, getContractorPaySetting, listContractorServiceOptions, updateContractor } from '../api/client';
+import { getContractor, getContractorPaySetting, listContractorServiceOptions, setBillingHoldOverride, updateContractor } from '../api/client';
 import { toUserMessage } from '../api/errorMessages';
 import type { ContractorDetailView, ContractorServiceOption, ContractorUpdateRequest, ContractorView } from '../api/types';
 
@@ -54,6 +54,19 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
   const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [inAppPayments, setInAppPayments] = useState(false);
+  const [holdOverride, setHoldOverride] = useState<boolean | null>(null);
+  const [holdSaving, setHoldSaving] = useState(false);
+  async function toggleHoldOverride(next: boolean) {
+    if (!detail) return;
+    setHoldSaving(true);
+    try {
+      setHoldOverride((await setBillingHoldOverride(contractor.contractorId, next)).override);
+    } catch {
+      setSubmitError('Could not change the billing override.');
+    } finally {
+      setHoldSaving(false);
+    }
+  }
   /** The platform-wide switch (Contractors page): off overrides this contractor's own switch. */
   const [globalPayOn, setGlobalPayOn] = useState<boolean | null>(null);
   useEffect(() => {
@@ -256,6 +269,27 @@ export default function ContractorSlideIn({ contractor, onClose, onSaved }: Prop
                     : 'On: the contractor sees "Get paid in the app" and can set up payouts. Until they finish, landlords mark jobs paid outside the app.')
                   : 'Off (the default): the "Get paid in the app" card is hidden on every contractor app, and landlords mark this contractor\'s jobs paid outside the app.'}
                 {globalPayOn === false && ' Contractor in-app payments are switched off for the whole platform (Contractors page), so this has no effect until they are switched on.'}
+              </p>
+            </fieldset>
+
+            <fieldset>
+              <legend>Billing</legend>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Automatic payments: {detail?.autopayMethod ? `on · ${detail.autopayMethod}` : 'off'}
+              </p>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={holdOverride ?? detail?.billingHoldOverride ?? false}
+                  disabled={!detail || holdSaving}
+                  onChange={(e) => void toggleHoldOverride(e.target.checked)}
+                  data-testid="contractor-billing-hold-override"
+                />
+                Keep offering new work while a statement is overdue
+              </label>
+              <p className="muted">
+                Off (the default): a contractor more than 14 days late on a platform-fee statement is not matched or invited
+                to new work orders until it is paid. Saved immediately.
               </p>
             </fieldset>
 
