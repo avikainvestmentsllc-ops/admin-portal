@@ -67,10 +67,14 @@ async function parseError(res: Response): Promise<ApiError> {
   }
 }
 
+/** Names this app to the server: tokens come back as its HttpOnly cookies, and cookie writes are allowed. */
+const PORTAL_HEADER = { 'X-Portal': 'admin' } as const;
+
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const res = await fetch(`${BASE}/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...PORTAL_HEADER },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
@@ -121,35 +125,58 @@ export function resetPassword(token: string, newPassword: string): Promise<Messa
   });
 }
 
+let inFlightRefresh: Promise<boolean> | null = null;
+
+/**
+ * New cookies for the refresh cookie (no body). A session from before the cookies sends its old
+ * localStorage refresh token once in the body instead; the server answers with cookies all the same.
+ */
 async function refreshTokens(): Promise<boolean> {
-  const refreshToken = tokenStorage.getRefreshToken();
-  if (!refreshToken) return false;
-  const res = await fetch(`${BASE}/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  });
-  if (!res.ok) {
-    tokenStorage.clear();
-    return false;
+  if (inFlightRefresh) return inFlightRefresh;
+  inFlightRefresh = (async () => {
+    const legacy = tokenStorage.takeLegacyRefreshToken();
+    try {
+      const res = await fetch(`${BASE}/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: legacy ? { 'Content-Type': 'application/json', ...PORTAL_HEADER } : { ...PORTAL_HEADER },
+        body: legacy ? JSON.stringify({ refreshToken: legacy }) : undefined,
+      });
+      if (!res.ok) {
+        tokenStorage.clear();
+        return false;
+      }
+      const data = (await res.json()) as LoginResponse;
+      if (data.user) tokenStorage.saveUser(data.user);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      inFlightRefresh = null;
+    }
+  })();
+  return inFlightRefresh;
+}
+
+/** Signs the admin app out of this browser: the server expires the cookies. */
+export async function logoutRequest(): Promise<void> {
+  try {
+    await fetch(`${BASE}/logout`, { method: 'POST', credentials: 'include', headers: { ...PORTAL_HEADER } });
+  } catch {
+    // offline: the cookies expire on their own
   }
-  const data = (await res.json()) as LoginResponse;
-  tokenStorage.save(data.token, data.user);
-  return true;
 }
 
 /**
- * Authenticated fetch: attaches the bearer access token, and on a 401 transparently
- * refreshes once and retries. If the refresh fails the caller gets the 401.
- * `url` is an absolute app path (e.g. "/managehouselease/onboarding/list").
+ * Authenticated fetch: the HttpOnly access cookie travels with the request (credentials), the
+ * X-Portal header names the app; on a 401 it refreshes once and retries. If the refresh fails the
+ * caller gets the 401. `url` is an absolute app path (e.g. "/managehouselease/onboarding/list").
  */
 export async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const withAuth = (): RequestInit => ({
     ...init,
-    headers: {
-      ...(init.headers ?? {}),
-      Authorization: `Bearer ${tokenStorage.getAccessToken() ?? ''}`,
-    },
+    credentials: 'include',
+    headers: { ...(init.headers ?? {}), ...PORTAL_HEADER },
   });
 
   let res = await fetch(url, withAuth());
