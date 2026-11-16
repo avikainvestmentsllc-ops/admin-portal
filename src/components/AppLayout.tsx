@@ -13,6 +13,7 @@ const NAV_ITEMS: { label: string; short: string; to: string; icon: IconName }[] 
   { label: 'Contractors', short: 'Contractors', to: '/contractors', icon: 'contractors' },
   { label: 'Real Estate Agents', short: 'Agents', to: '/agents', icon: 'agents' },
   { label: 'Landlord Agreement', short: 'Landlord', to: '/landlord-terms', icon: 'pricing' },
+  { label: 'Terms of Service', short: 'Terms', to: '/terms-of-service', icon: 'pricing' },
   { label: 'Agent Agreement', short: 'Agreement', to: '/agent-terms', icon: 'pricing' },
   { label: 'Platform Fees', short: 'Fees', to: '/platform-fees', icon: 'fees' },
   { label: 'Contractor Payments', short: 'Paid', to: '/contractor-payments', icon: 'fees' },

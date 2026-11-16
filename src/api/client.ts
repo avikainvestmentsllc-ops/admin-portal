@@ -825,3 +825,52 @@ export async function loadLandlordTermsFile(termsId: string): Promise<string> {
   if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
   return URL.createObjectURL(await res.blob());
 }
+
+// ---------- Terms of Service (every user accepts at sign-in; emailed at 2 AM ET after publishing) ----------
+
+const TERMS_OF_SERVICE = `${API_BASE}/managehouselease/terms-of-service`;
+
+export interface TermsOfServiceVersion {
+  tosId: string;
+  version: number;
+  title: string | null;
+  summary: string | null;
+  effectiveFrom: string;
+  state: 'EFFECTIVE' | 'SCHEDULED' | 'SUPERSEDED';
+  sizeBytes: number;
+  createdBy: string | null;
+  createdAt: string;
+  acceptedCount: number;
+  activeUsers: number;
+  emailStatus: 'PENDING' | 'QUEUED' | 'DONE';
+  emailedAt: string | null;
+  emailsSent: number;
+  emailsPending: number;
+  emailsFailed: number;
+}
+
+export function listTermsOfService(): Promise<TermsOfServiceVersion[]> {
+  return authJson<TermsOfServiceVersion[]>(TERMS_OF_SERVICE);
+}
+
+export async function createTermsOfService(file: File, effectiveDate: string, title: string, summary: string): Promise<TermsOfServiceVersion> {
+  const body = new FormData();
+  body.append('file', file);
+  if (summary.trim()) body.append('summary', summary.trim());
+  const q = new URLSearchParams({ effectiveDate });
+  if (title.trim()) q.set('title', title.trim());
+  const res = await authFetch(`${TERMS_OF_SERVICE}?${q}`, { method: 'POST', body });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return (await res.json()) as TermsOfServiceVersion;
+}
+
+export async function deleteTermsOfService(tosId: string): Promise<void> {
+  const res = await authFetch(`${TERMS_OF_SERVICE}/${tosId}`, { method: 'DELETE' });
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+}
+
+export async function loadTermsOfServiceFile(tosId: string): Promise<string> {
+  const res = await authFetch(`${TERMS_OF_SERVICE}/${tosId}/file`);
+  if (!res.ok) throw new ApiRequestError(res.status, await parseError(res));
+  return URL.createObjectURL(await res.blob());
+}

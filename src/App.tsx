@@ -17,6 +17,7 @@ import ContractorsPage from './pages/ContractorsPage';
 import AgentsPage from './pages/AgentsPage';
 import AgentTermsPage from './pages/AgentTermsPage';
 import LandlordTermsPage from './pages/LandlordTermsPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 import PlatformFeesPage from './pages/PlatformFeesPage';
 import ContractorPaymentsPage from './pages/ContractorPaymentsPage';
 import ReceivablesPage from './pages/ReceivablesPage';
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/agent-terms" element={<AgentTermsPage />} />
             <Route path="/landlord-terms" element={<LandlordTermsPage />} />
+            <Route path="/terms-of-service" element={<TermsOfServicePage />} />
             <Route path="/platform-fees" element={<PlatformFeesPage />} />
             <Route path="/contractor-payments" element={<ContractorPaymentsPage />} />
             <Route path="/receivables" element={<ReceivablesPage />} />
